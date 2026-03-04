@@ -2,7 +2,7 @@
 #include <windows.h>
 #include <iostream>
 #include <iomanip>
-
+#include "../class/matrix.h"
 using namespace std;
 
 int main() {
@@ -26,22 +26,21 @@ int main() {
 
     cout << "\nВыполняем прямой проход\n";
 
-    // тестовые данные для XOR
-    vector<vector<double>> tests = {
-        {0, 0},
-        {0, 1},
-        {1, 0},
-        {1, 1}
-    };
+    // Создаем матрицу 4x2 для тестовых данных
+    Matrix<double> tests(4, 2);
+
+    // Заполняем значениями
+    tests(0, 0) = 0; tests(0, 1) = 0;  // {0, 0}
+    tests(1, 0) = 0; tests(1, 1) = 1;  // {0, 1}
+    tests(2, 0) = 1; tests(2, 1) = 0;  // {1, 0}
+    tests(3, 0) = 1; tests(3, 1) = 1;  // {1, 1}
 
     // для каждого тестового примера
-    for (const auto& test : tests) {
-        // получаем ответ от нейросети
+    for (int i = 0; i < tests.rows(); i++) {
+        vector<double> test = {tests(i, 0), tests(i, 1)};
         auto result = net.forward(test);
-        // выводим результат
-        cout << "Вход: [" << test[0] << ", " << test[1] << "] - Выход: " << result[0] << endl;
+        cout << "Вход: [" << tests(i, 0) << ", " << tests(i, 1) << "] - Выход: " << result[0] << endl;
     }
-
     // сохраняем текущее состояние сети в файл
     if (net.saveModel("model.txt")) {
         cout << "\nМодель сохранена в model.txt\n";
@@ -77,8 +76,6 @@ int main() {
         {0}
     };
 
-    // Простейшее ручное обучение (имитация, так как у нас нет обратного распространения)
-    // В реальности нужно реализовать метод train в классе NeuralNetwork
     cout << "Примечание: Для реального обучения нужно реализовать метод train\n";
     cout << "в классе NeuralNetwork с алгоритмом обратного распространения ошибки\n\n";
 
@@ -96,10 +93,10 @@ int main() {
 
     for (size_t i = 0; i < layers.size(); ++i) {
         cout << "Слой " << i + 1 << ":\n";
-        cout << "  Веса: " << layers[i].weights.size() << "x"
-                  << (layers[i].weights.empty() ? 0 : layers[i].weights[0].size()) << endl;
-        cout << "  Смещения: " << layers[i].biases.size() << "x"
-                  << (layers[i].biases.empty() ? 0 : layers[i].biases[0].size()) << endl;
+        cout << "  Веса: " << layers[i].weights.rows() << "x"
+                  << layers[i].weights.cols() << endl;
+        cout << "  Смещения: " << layers[i].biases.rows() << "x"
+                  << layers[i].biases.cols() << endl;
     }
 
     return 0;
