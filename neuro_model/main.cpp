@@ -3,8 +3,13 @@
 #include <iostream>
 #include <iomanip>
 #include "../class/matrix.h"
-using namespace std;
 
+using namespace std;
+string getCurrentPath() {
+    char buffer[MAX_PATH];
+    GetCurrentDirectoryA(MAX_PATH, buffer);
+    return string(buffer);
+}
 int main() {
     // настраиваем кодировку для русского текста в консоли
     SetConsoleOutputCP(CP_UTF8);
@@ -43,7 +48,7 @@ int main() {
     }
     // сохраняем текущее состояние сети в файл
     if (net.saveModel("model.txt")) {
-        cout << "\nМодель сохранена в model.txt\n";
+        cout << "Полный путь: " << getCurrentPath() << "\\model.txt" << endl;
     }
 
     cout << "\nСоздаем новую сеть и загружаем сохраненную модель\n";
