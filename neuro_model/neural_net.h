@@ -7,7 +7,7 @@
 #include <fstream> // для работы с файлами
 #include <string> // для работы со строками(имена файлов)
 
-using namespace std;   
+using namespace std;
 
 // класс нейросети
 class NeuralNetwork {

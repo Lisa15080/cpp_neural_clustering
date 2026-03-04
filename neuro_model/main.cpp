@@ -1,7 +1,7 @@
-// подключаем нашу нейросеть
 #include "neural_net.h"
-// подключаем для работы с русским языком в консоли
 #include <windows.h>
+#include <iostream>
+#include <iomanip>
 
 using namespace std;
 
@@ -10,7 +10,8 @@ int main() {
     SetConsoleOutputCP(CP_UTF8);
     SetConsoleCP(CP_UTF8);
 
-    cout << "Тест\n";
+    cout << "Тест нейросети\n";
+    cout << "========================\n";
 
     // тест 1
     cout << "Создаем сеть с логированием в файл\n";
@@ -28,9 +29,9 @@ int main() {
     // тестовые данные для XOR
     vector<vector<double>> tests = {
         {0, 0},
-        {0, 1},  
-        {1, 0},  
-        {1, 1}   
+        {0, 1},
+        {1, 0},
+        {1, 1}
     };
 
     // для каждого тестового примера
@@ -43,19 +44,63 @@ int main() {
 
     // сохраняем текущее состояние сети в файл
     if (net.saveModel("model.txt")) {
-        cout << "Модель сохранена в my_model.txt\n";
+        cout << "\nМодель сохранена в model.txt\n";
     }
 
     cout << "\nСоздаем новую сеть и загружаем сохраненную модель\n";
 
-    // создаем вторую сеть (тоже с логированием, но в другой файл)
+    // создаем вторую сеть
     NeuralNetwork net2({ 2, 3, 1 }, true, "network_log2.txt");
 
-    net2.loadModel("model.txt");
+    if (net2.loadModel("model.txt")) {
+        cout << "Модель загружена из model.txt\n";
+    }
 
     // проверяем что загрузилось
-    cout << "Веса после загрузки:\n";
+    cout << "\nВеса после загрузки:\n";
     net2.printLayers();
+
+    // Ручное обучение сети на XOR (так как нет метода train)
+    cout << "\nОбучаем сеть на XOR (10 эпох с ручным обучением):\n";
+
+    vector<vector<double>> inputs = {
+        {0, 0},
+        {0, 1},
+        {1, 0},
+        {1, 1}
+    };
+
+    vector<vector<double>> targets = {
+        {0},
+        {1},
+        {1},
+        {0}
+    };
+
+    // Простейшее ручное обучение (имитация, так как у нас нет обратного распространения)
+    // В реальности нужно реализовать метод train в классе NeuralNetwork
+    cout << "Примечание: Для реального обучения нужно реализовать метод train\n";
+    cout << "в классе NeuralNetwork с алгоритмом обратного распространения ошибки\n\n";
+
+    cout << "Текущие результаты работы сети (без обучения):\n";
+    for (size_t i = 0; i < inputs.size(); ++i) {
+        auto result = net.forward(inputs[i]);
+        cout << "Вход: [" << inputs[i][0] << ", " << inputs[i][1]
+                  << "] - Выход: " << fixed << setprecision(6) << result[0]
+                  << " (ожидаем: " << targets[i][0] << ")\n";
+    }
+
+    cout << "\nРабота с отдельными слоями через getLayers():\n";
+    auto& layers = net.getLayers();
+    cout << "Количество слоев: " << layers.size() << endl;
+
+    for (size_t i = 0; i < layers.size(); ++i) {
+        cout << "Слой " << i + 1 << ":\n";
+        cout << "  Веса: " << layers[i].weights.size() << "x"
+                  << (layers[i].weights.empty() ? 0 : layers[i].weights[0].size()) << endl;
+        cout << "  Смещения: " << layers[i].biases.size() << "x"
+                  << (layers[i].biases.empty() ? 0 : layers[i].biases[0].size()) << endl;
+    }
 
     return 0;
 }
