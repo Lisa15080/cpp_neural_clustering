@@ -1,20 +1,43 @@
 #include "neural_net.h"
-#include <windows.h>
+#include "dataset.h"
 #include <iostream>
 #include <iomanip>
+#include <cstdlib>
+#include <cstring>
+
+// Кроссплатформенные заголовки
+#ifdef _WIN32
+    #include <direct.h>
+    #include <windows.h>
+#else
+    #include <unistd.h>
+    #include <limits.h>
+#endif
+
 #include "../class/matrix.h"
 
-using namespace std;
 string getCurrentPath() {
-    char buffer[MAX_PATH];
-    GetCurrentDirectoryA(MAX_PATH, buffer);
-    return string(buffer);
+    char buffer[1024];
+#ifdef _WIN32
+    // Windows
+    if (_getcwd(buffer, sizeof(buffer)) != nullptr) {
+        return string(buffer);
+    }
+#else
+    // Linux/Mac
+    if (getcwd(buffer, sizeof(buffer)) != nullptr) {
+        return string(buffer);
+    }
+#endif
+    return ".";
 }
+
 int main() {
     // настраиваем кодировку для русского текста в консоли
-    SetConsoleOutputCP(CP_UTF8);
-    SetConsoleCP(CP_UTF8);
-
+    #ifdef _WIN32
+        SetConsoleOutputCP(CP_UTF8);
+        SetConsoleCP(CP_UTF8);
+    #endif
     cout << "Тест нейросети\n";
     cout << "========================\n";
 
@@ -31,7 +54,19 @@ int main() {
 
     cout << "\nВыполняем прямой проход\n";
 
-    // Создаем матрицу 4x2 для тестовых данных
+    // ===== ГЕНЕРАЦИЯ ГАУССОВЫХ КЛАСТЕРОВ =====
+    DatasetGenerator generator;
+    Dataset data = generator.generate_gaussian(100, 0.5, 2.0);
+
+    cout << "\nСгенерировано гауссовых кластеров: " << data.inputs.size() << " точек\n";
+    cout << "Пример первых 5 точек:\n";
+    for (int i = 0; i < 5 && i < data.inputs.size(); i++) {
+        cout << "  [" << data.inputs[i][0] << ", " << data.inputs[i][1] 
+             << "] -> класс " << data.targets[i][0] << endl;
+    }
+    // ===========================================
+
+    // Создаем матрицу 4x2 для тестовых данных (XOR для проверки)
     Matrix<double> tests(4, 2);
 
     // Заполняем значениями
