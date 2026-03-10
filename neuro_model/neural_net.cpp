@@ -11,7 +11,7 @@ void NeuralNetwork::log(const string& message, bool toConsole) {
     if (loggingEnabled && logFile.is_open()) logFile << message;
 }
 
-// Конструктор - изменен для работы с Matrix
+// Конструктор
 NeuralNetwork::NeuralNetwork(const vector<int>& sizes, bool enableLogging, const string& filename) {
     srand(time(nullptr));
 
@@ -40,11 +40,9 @@ NeuralNetwork::NeuralNetwork(const vector<int>& sizes, bool enableLogging, const
         log(layerMsg);
 
         Layer layer;
-        // Используем конструктор Matrix
         layer.weights = Matrix<double>(outputSize, inputSize);
         layer.biases = Matrix<double>(outputSize, 1);
 
-        // Заполняем через operator()
         for (int j = 0; j < outputSize; j++) {
             for (int k = 0; k < inputSize; k++) {
                 layer.weights(j, k) = ((double)rand() / RAND_MAX) * 2 - 1;
@@ -58,7 +56,7 @@ NeuralNetwork::NeuralNetwork(const vector<int>& sizes, bool enableLogging, const
     log("Нейросеть создана\n\n");
 }
 
-// Функции активации (без изменений)
+// Функции активации
 double NeuralNetwork::sigmoid(double x) {
     return 1.0 / (1.0 + exp(-x));
 }
@@ -76,67 +74,28 @@ double NeuralNetwork::reluDerivative(double x) {
     return x > 0 ? 1 : 0;
 }
 
-// forward с использованием Matrix
+// Прямой проход
 vector<double> NeuralNetwork::forward(const vector<double>& input) {
     string msg = "Прямой проход: входные данные = ";
     for (double val : input) msg += to_string(val) + " ";
     log(msg + "\n");
 
-    // Превращаем вход в матрицу-столбец
     Matrix<double> current(input.size(), 1);
     for (size_t i = 0; i < input.size(); i++) {
         current(i, 0) = input[i];
     }
 
-    log("Преобразовали вход в матрицу:\n");
-    for (size_t i = 0; i < current.rows(); i++) {
-        log("  [" + to_string(current(i, 0)) + "]\n");
-    }
-
     for (size_t layerIdx = 0; layerIdx < layers.size(); layerIdx++) {
         const Layer& layer = layers[layerIdx];
-
-        log("Слой " + to_string(layerIdx) + ":\n");
-        log("  Веса (" + to_string(layer.weights.rows()) + "x" +
-            to_string(layer.weights.cols()) + "):\n");
-
-        // МАТРИЧНОЕ УМНОЖЕНИЕ - главное изменение!
         Matrix<double> next = layer.weights * current;
 
-        // Добавляем смещения и применяем активацию
         for (size_t i = 0; i < next.rows(); i++) {
-            string neuronMsg = "    Нейрон " + to_string(i) + ": ";
-
-            // Показываем вычисления для первых нейронов
-            if (i < 3) {
-                for (size_t j = 0; j < min(size_t(3), current.rows()); j++) {
-                    neuronMsg += to_string(layer.weights(i, j)) + "*" +
-                        to_string(current(j, 0));
-                    if (j < min(size_t(3), current.rows()) - 1) neuronMsg += " + ";
-                }
-                if (current.rows() > 3) neuronMsg += " + ...";
-                neuronMsg += " + " + to_string(layer.biases(i, 0)) + " = ";
-            }
-
             next(i, 0) += layer.biases(i, 0);
-
-            if (i < 3) {
-                neuronMsg += to_string(next(i, 0));
-                neuronMsg += " -> сигмоида -> ";
-            }
-
             next(i, 0) = sigmoid(next(i, 0));
-
-            if (i < 3) {
-                neuronMsg += to_string(next(i, 0)) + "\n";
-                log(neuronMsg);
-            }
         }
-
         current = next;
     }
 
-    // Превращаем обратно в вектор
     vector<double> result(current.rows());
     for (size_t i = 0; i < current.rows(); i++) {
         result[i] = current(i, 0);
@@ -149,7 +108,8 @@ vector<double> NeuralNetwork::forward(const vector<double>& input) {
     return result;
 }
 
-// printLayers - изменен для работы с Matrix
+
+// Печать слоёв
 void NeuralNetwork::printLayers() {
     string msg = "Структура нейросети:\n";
     log(msg);
@@ -175,7 +135,7 @@ void NeuralNetwork::printLayers() {
     }
 }
 
-// saveModel - изменен для работы с Matrix
+// Сохранение модели
 bool NeuralNetwork::saveModel(const string& filename) {
     ofstream file(filename);
     if (!file.is_open()) {
@@ -208,7 +168,7 @@ bool NeuralNetwork::saveModel(const string& filename) {
     return true;
 }
 
-// loadModel - изменен для работы с Matrix
+// Загрузка модели
 bool NeuralNetwork::loadModel(const string& filename) {
     ifstream file(filename);
     if (!file.is_open()) {

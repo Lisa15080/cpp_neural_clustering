@@ -34,10 +34,11 @@ public:
     double relu(double x);
     double reluDerivative(double x);
 
-    void printLayers();  // оставляем как было
+    void printLayers();
     vector<Layer>& getLayers() { return layers; }
     bool saveModel(const string& filename);
     bool loadModel(const string& filename);
+ 
 };
 
 #endif
