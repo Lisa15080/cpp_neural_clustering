@@ -1,6 +1,6 @@
-#include "neural_net.h"
-#include "trainer.h"       
-#include "dataset.h"
+#include "Neural_Net/neural_net.h"
+#include "Trainer_class/trainer.h"
+#include "DataSet/dataset.h"
 #include <iostream>
 #include <iomanip>
 #include <cstdlib>
@@ -14,7 +14,7 @@
     #include <limits.h>
 #endif
 
-#include "../class/matrix.h"
+#include "../class/Matrix/matrix.h"
 
 using namespace std;
 

@@ -1,8 +1,8 @@
-#include "dataset.h"
+#include "../neuro_model/DataSet/dataset.h"
 #include <cmath>
 #include <cstdlib>
 #include <ctime>
-
+#include <cstddef>
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif

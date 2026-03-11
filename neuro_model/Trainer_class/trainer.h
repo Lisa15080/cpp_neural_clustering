@@ -1,8 +1,8 @@
 #ifndef TRAINER_H
 #define TRAINER_H
 
-#include "neural_net.h"
-#include "dataset.h"
+#include "Neural_Net/neural_net.h"
+#include "DataSet/dataset.h"
 #include <vector>
 #include <iostream>
 

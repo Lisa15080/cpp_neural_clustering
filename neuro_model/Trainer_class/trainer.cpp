@@ -1,7 +1,7 @@
-#include "trainer.h"
+#include "../Trainer_class/trainer.h"
 #include <cmath>
 #include <iomanip>
-
+#include "../../class/Matrix/matrix.h"
 using namespace std;
 
 // Конструктор
