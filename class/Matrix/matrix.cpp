@@ -2,17 +2,9 @@
 #define MATRIX_CPP
 
 #include "matrix.h"
-#include <stdexcept>
-#include <random>
-#include <cmath>
-#include <algorithm>
-#include <type_traits>
 
-#ifdef _OPENMP
-#include <omp.h>
-#endif
+// ==================== КОНСТРУКТОРЫ ====================
 
-// Конструкторы
 template<typename T>
 Matrix<T>::Matrix() : rows_(0), cols_(0) {}
 
@@ -20,7 +12,38 @@ template<typename T>
 Matrix<T>::Matrix(size_t rows, size_t cols, T init_value)
     : rows_(rows), cols_(cols), data_(rows * cols, init_value) {}
 
-// Доступ к элементам с проверкой границ
+template<typename T>
+Matrix<T>::Matrix(std::initializer_list<std::initializer_list<T>> list) {
+    rows_ = list.size();
+    if (rows_ == 0) {
+        cols_ = 0;
+        return;
+    }
+
+    cols_ = list.begin()->size();
+    data_.resize(rows_ * cols_);
+
+    size_t i = 0;
+    for (const auto& row : list) {
+        if (row.size() != cols_) {
+            throw std::invalid_argument("All rows must have the same size");
+        }
+        size_t j = 0;
+        for (const T& val : row) {
+            (*this)(i, j++) = val;
+        }
+        ++i;
+    }
+}
+
+template<typename T>
+Matrix<T>& Matrix<T>::operator=(std::initializer_list<std::initializer_list<T>> list) {
+    *this = Matrix<T>(list);
+    return *this;
+}
+
+// ==================== ДОСТУП К ЭЛЕМЕНТАМ ====================
+
 template<typename T>
 T& Matrix<T>::operator()(size_t i, size_t j) {
     if (i >= rows_ || j >= cols_) {
@@ -37,13 +60,89 @@ const T& Matrix<T>::operator()(size_t i, size_t j) const {
     return data_[i * cols_ + j];
 }
 
-// Заполнение
+// ==================== МЕТОДЫ ЗАПОЛНЕНИЯ ====================
+
+template<typename T>
+Matrix<T>& Matrix<T>::set(size_t i, size_t j, T value) {
+    (*this)(i, j) = value;
+    return *this;
+}
+
+template<typename T>
+Matrix<T>& Matrix<T>::setRow(size_t row, const std::vector<T>& values) {
+    if (values.size() != cols_) {
+        throw std::invalid_argument("Row size mismatch: expected " +
+                                  std::to_string(cols_) + ", got " +
+                                  std::to_string(values.size()));
+    }
+    for (size_t j = 0; j < cols_; ++j) {
+        (*this)(row, j) = values[j];
+    }
+    return *this;
+}
+
+template<typename T>
+Matrix<T>& Matrix<T>::setRow(size_t row, std::initializer_list<T> values) {
+    return setRow(row, std::vector<T>(values));
+}
+
+template<typename T>
+Matrix<T>& Matrix<T>::setCol(size_t col, const std::vector<T>& values) {
+    if (values.size() != rows_) {
+        throw std::invalid_argument("Column size mismatch: expected " +
+                                  std::to_string(rows_) + ", got " +
+                                  std::to_string(values.size()));
+    }
+    for (size_t i = 0; i < rows_; ++i) {
+        (*this)(i, col) = values[i];
+    }
+    return *this;
+}
+
+template<typename T>
+Matrix<T>& Matrix<T>::setCol(size_t col, std::initializer_list<T> values) {
+    return setCol(col, std::vector<T>(values));
+}
+
+template<typename T>
+Matrix<T>& Matrix<T>::setAll(const std::vector<T>& values) {
+    if (values.size() != rows_ * cols_) {
+        throw std::invalid_argument("Values size mismatch");
+    }
+    data_ = values;
+    return *this;
+}
+
+template<typename T>
+Matrix<T>& Matrix<T>::setAll(std::initializer_list<T> values) {
+    return setAll(std::vector<T>(values));
+}
+
+template<typename T>
+Matrix<T>& Matrix<T>::setDiagonal(const std::vector<T>& values) {
+    size_t n = std::min({rows_, cols_, values.size()});
+    for (size_t i = 0; i < n; ++i) {
+        (*this)(i, i) = values[i];
+    }
+    return *this;
+}
+
+template<typename T>
+Matrix<T>& Matrix<T>::setDiagonal(T value) {
+    size_t n = std::min(rows_, cols_);
+    for (size_t i = 0; i < n; ++i) {
+        (*this)(i, i) = value;
+    }
+    return *this;
+}
+
+// ==================== БАЗОВЫЕ ОПЕРАЦИИ ====================
+
 template<typename T>
 void Matrix<T>::fill(T value) {
     std::fill(data_.begin(), data_.end(), value);
 }
 
-// Транспонирование
 template<typename T>
 Matrix<T> Matrix<T>::transpose() const {
     Matrix<T> result(cols_, rows_);
@@ -55,7 +154,8 @@ Matrix<T> Matrix<T>::transpose() const {
     return result;
 }
 
-// Реализация блочного умножения
+// ==================== УМНОЖЕНИЕ ====================
+
 template<typename T>
 void Matrix<T>::multiplyBlock(const Matrix& other, Matrix& result,
                              size_t start_i, size_t start_j, size_t start_k,
@@ -76,7 +176,6 @@ void Matrix<T>::multiplyBlock(const Matrix& other, Matrix& result,
     }
 }
 
-// Умножение с оптимизациями
 template<typename T>
 Matrix<T> Matrix<T>::multiply(const Matrix& other) const {
     if (cols_ != other.rows_) {
@@ -87,7 +186,6 @@ Matrix<T> Matrix<T>::multiply(const Matrix& other) const {
 
     // Оптимизация для малых матриц
     if (rows_ * cols_ * other.cols_ < 1024) {
-        // Наивное умножение
         for (size_t i = 0; i < rows_; ++i) {
             for (size_t k = 0; k < cols_; ++k) {
                 T aik = (*this)(i, k);
@@ -99,7 +197,6 @@ Matrix<T> Matrix<T>::multiply(const Matrix& other) const {
             }
         }
     } else {
-        // Блочное умножение
         const size_t BLOCK_SIZE = 64;
 
         #ifdef _OPENMP
@@ -117,7 +214,6 @@ Matrix<T> Matrix<T>::multiply(const Matrix& other) const {
     return result;
 }
 
-// Операторы
 template<typename T>
 Matrix<T> Matrix<T>::operator*(const Matrix& other) const {
     return multiply(other);
@@ -129,7 +225,8 @@ Matrix<T>& Matrix<T>::operator*=(const Matrix& other) {
     return *this;
 }
 
-// Статические методы
+// ==================== СТАТИЧЕСКИЕ МЕТОДЫ ====================
+
 template<typename T>
 Matrix<T> Matrix<T>::identity(size_t n) {
     Matrix<T> result(n, n, T{});
@@ -139,66 +236,67 @@ Matrix<T> Matrix<T>::identity(size_t n) {
     return result;
 }
 
-// Вспомогательные функции для random с использованием SFINAE
-template<typename T>
-typename std::enable_if<std::is_integral<T>::value, void>::type
-fill_random(std::vector<T>& data, size_t size, T min, T max) {
-    static std::random_device rd;
-    static std::mt19937 gen(rd());
-    std::uniform_int_distribution<T> dis(min, max);
+// Вспомогательные функции для random
+namespace {
+    template<typename T>
+    typename std::enable_if<std::is_integral<T>::value, void>::type
+    fill_random_impl(std::vector<T>& data, size_t size, T min, T max) {
+        static std::random_device rd;
+        static std::mt19937 gen(rd());
+        std::uniform_int_distribution<T> dis(min, max);
 
-    for (size_t i = 0; i < size; ++i) {
-        data[i] = dis(gen);
+        for (size_t i = 0; i < size; ++i) {
+            data[i] = dis(gen);
+        }
+    }
+
+    template<typename T>
+    typename std::enable_if<std::is_floating_point<T>::value, void>::type
+    fill_random_impl(std::vector<T>& data, size_t size, T min, T max) {
+        static std::random_device rd;
+        static std::mt19937 gen(rd());
+        std::uniform_real_distribution<T> dis(min, max);
+
+        for (size_t i = 0; i < size; ++i) {
+            data[i] = dis(gen);
+        }
+    }
+
+    template<typename T>
+    typename std::enable_if<!std::is_integral<T>::value && !std::is_floating_point<T>::value, void>::type
+    fill_random_impl(std::vector<T>& data, size_t size, T min, T max) {
+        static std::random_device rd;
+        static std::mt19937 gen(rd());
+        std::uniform_int_distribution<int> dis(static_cast<int>(min), static_cast<int>(max));
+
+        for (size_t i = 0; i < size; ++i) {
+            data[i] = static_cast<T>(dis(gen));
+        }
     }
 }
 
-template<typename T>
-typename std::enable_if<std::is_floating_point<T>::value, void>::type
-fill_random(std::vector<T>& data, size_t size, T min, T max) {
-    static std::random_device rd;
-    static std::mt19937 gen(rd());
-    std::uniform_real_distribution<T> dis(min, max);
-
-    for (size_t i = 0; i < size; ++i) {
-        data[i] = dis(gen);
-    }
-}
-
-template<typename T>
-typename std::enable_if<!std::is_integral<T>::value && !std::is_floating_point<T>::value, void>::type
-fill_random(std::vector<T>& data, size_t size, T min, T max) {
-    static std::random_device rd;
-    static std::mt19937 gen(rd());
-    std::uniform_int_distribution<int> dis(static_cast<int>(min), static_cast<int>(max));
-
-    for (size_t i = 0; i < size; ++i) {
-        data[i] = static_cast<T>(dis(gen));
-    }
-}
-
-// Метод random с использованием вспомогательных функций
 template<typename T>
 Matrix<T> Matrix<T>::random(size_t rows, size_t cols, T min, T max) {
     Matrix<T> result(rows, cols);
-    fill_random(result.data_, rows * cols, min, max);
+    fill_random_impl(result.data_, rows * cols, min, max);
     return result;
 }
 
-// Оператор вывода
+// ==================== СВОБОДНЫЕ ФУНКЦИИ ====================
+
 template<typename T>
 std::ostream& operator<<(std::ostream& os, const Matrix<T>& mat) {
-    for (size_t i = 0; i < mat.rows(); ++i) {
+    for (size_t i = 0; i < mat.rows_; ++i) {
         os << "[";
-        for (size_t j = 0; j < mat.cols(); ++j) {
+        for (size_t j = 0; j < mat.cols_; ++j) {
             os << std::setw(10) << std::setprecision(4) << mat(i, j);
-            if (j < mat.cols() - 1) os << ", ";
+            if (j < mat.cols_ - 1) os << ", ";
         }
         os << "]\n";
     }
     return os;
 }
 
-// Умножение с транспонированием
 template<typename T>
 Matrix<T> multiplyWithTranspose(const Matrix<T>& a, const Matrix<T>& b) {
     Matrix<T> bt = b.transpose();
@@ -219,12 +317,11 @@ Matrix<T> multiplyWithTranspose(const Matrix<T>& a, const Matrix<T>& b) {
     return result;
 }
 
-// Явная инстанциация для часто используемых типов
+// ==================== ЯВНАЯ ИНСТАНЦИАЦИЯ ====================
 template class Matrix<double>;
 template class Matrix<float>;
 template class Matrix<int>;
 
-// Явная инстанциация для свободных функций
 template std::ostream& operator<< <double>(std::ostream&, const Matrix<double>&);
 template std::ostream& operator<< <float>(std::ostream&, const Matrix<float>&);
 template std::ostream& operator<< <int>(std::ostream&, const Matrix<int>&);
