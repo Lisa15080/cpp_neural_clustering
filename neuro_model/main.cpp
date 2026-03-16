@@ -1,61 +1,121 @@
-// подключаем нашу нейросеть
-#include "neural_net.h"
-// подключаем для работы с русским языком в консоли
-#include <windows.h>
+#include "Neural_Net/neural_net.h"
+#include "Trainer_class/trainer.h"
+#include "DataSet/dataset.h"
+#include <iostream>
+#include <iomanip>
+#include <cstdlib>
+#include <cstring>
+
+#ifdef _WIN32
+    #include <direct.h>
+    #include <windows.h>
+#else
+    #include <unistd.h>
+    #include <limits.h>
+#endif
+
+#include "../class/Matrix/matrix.h"
 
 using namespace std;
 
+string getCurrentPath() {
+    char buffer[1024];
+#ifdef _WIN32
+    if (_getcwd(buffer, sizeof(buffer)) != nullptr) {
+        return string(buffer);
+    }
+#else
+    if (getcwd(buffer, sizeof(buffer)) != nullptr) {
+        return string(buffer);
+    }
+#endif
+    return ".";
+}
+
 int main() {
-    // настраиваем кодировку для русского текста в консоли
-    SetConsoleOutputCP(CP_UTF8);
-    SetConsoleCP(CP_UTF8);
+    #ifdef _WIN32
+        SetConsoleOutputCP(CP_UTF8);
+        SetConsoleCP(CP_UTF8);
+    #endif
 
-    cout << "Тест\n";
+    cout << "Тест нейросети\n";
+    cout << "========================\n";
 
-    // тест 1
-    cout << "Создаем сеть с логированием в файл\n";
+    // Генерация данных
+    DatasetGenerator generator;
+    Dataset data = generator.generate_gaussian(100, 0.5, 2.0);
 
-    // создаем сеть: 2 входа, 3 скрытых нейрона, 1 выход
-    // включаем логирование в файл "network_log.txt"
-    NeuralNetwork net({ 2, 3, 1 }, true, "network_log.txt");
+    cout << "\nСгенерировано гауссовых кластеров: " << data.inputs.size() << " точек\n";
 
-    // печатаем начальные веса
-    cout << "\nНачальные веса:\n";
-    net.printLayers();
+    // Данные для XOR
+    vector<vector<double>> xor_inputs = {{0,0}, {0,1}, {1,0}, {1,1}};
+    vector<vector<double>> xor_targets = {{0}, {1}, {1}, {0}};
 
-    cout << "\nВыполняем прямой проход\n";
+    // СЕТЬ 1: XOR 
+    cout << "\n[1] Создаём сеть для XOR: 2→3→1\n";
+    NeuralNetwork net({2, 3, 1}, true, "network_log.txt");
 
-    // тестовые данные для XOR
-    vector<vector<double>> tests = {
-        {0, 0},
-        {0, 1},  
-        {1, 0},  
-        {1, 1}   
-    };
-
-    // для каждого тестового примера
-    for (const auto& test : tests) {
-        // получаем ответ от нейросети
-        auto result = net.forward(test);
-        // выводим результат
-        cout << "Вход: [" << test[0] << ", " << test[1] << "] - Выход: " << result[0] << endl;
+    cout << "\nРезультаты ДО обучения:\n";
+    for (size_t i = 0; i < xor_inputs.size(); i++) {
+        auto res = net.forward(xor_inputs[i]);
+        cout << "  [" << xor_inputs[i][0] << "," << xor_inputs[i][1] 
+             << "] → " << fixed << setprecision(4) << res[0] << "\n";
     }
 
-    // сохраняем текущее состояние сети в файл
+    cout << "\nОбучаем сеть на XOR (1000 эпох):\n";
+    TrainingConfig cfg_xor;
+    cfg_xor.epochs = 1000;
+    cfg_xor.learning_rate = 0.5;
+    cfg_xor.verbose = true;
+    
+    Trainer trainer_xor(net, cfg_xor);
+    trainer_xor.train(xor_inputs, xor_targets);
+
+    cout << "\nРезультаты ПОСЛЕ обучения:\n";
+    for (size_t i = 0; i < xor_inputs.size(); i++) {
+        auto res = net.forward(xor_inputs[i]);
+        cout << "  [" << xor_inputs[i][0] << "," << xor_inputs[i][1] 
+             << "] → " << fixed << setprecision(4) << res[0] 
+             << " (ожидаем: " << xor_targets[i][0] << ")\n";
+    }
+
+    // СЕТЬ 2: ГАУССОВЫ КЛАСТЕРЫ
+    cout << "\n\n[2] Создаём сеть для гауссовых кластеров: 2→5→1\n";
+    NeuralNetwork net2({2, 5, 1}, true, "network_log2.txt");
+    
+    cout << "Обучаем на гауссовых кластерах (500 эпох):\n";
+    TrainingConfig cfg_gauss;
+    cfg_gauss.epochs = 500;
+    cfg_gauss.learning_rate = 0.1;
+    cfg_gauss.verbose = true;
+    
+    Trainer trainer_gauss(net2, cfg_gauss);
+    trainer_gauss.train(data.inputs, data.targets);
+
+    // Проверка точности
+    double accuracy = trainer_gauss.evaluate(data);
+    cout << "\nТочность на гауссовых кластерах: " << fixed << setprecision(2) << accuracy << "%\n";
+
+    // Сохранение/загрузка
+    cout << "\n[3] Сохраняем модель...\n";
     if (net.saveModel("model.txt")) {
-        cout << "Модель сохранена в my_model.txt\n";
+        cout << "Модель сохранена: " << getCurrentPath() << "/model.txt\n";
     }
 
-    cout << "\nСоздаем новую сеть и загружаем сохраненную модель\n";
+    cout << "\nЗагружаем и проверяем:\n";
+    NeuralNetwork net_loaded({2, 3, 1}, false);
+    if (net_loaded.loadModel("model.txt")) {
+        cout << "Модель загружена успешно!\n";
+        cout << "Проверка на XOR:\n";
+        for (size_t i = 0; i < xor_inputs.size(); i++) {
+            auto res = net_loaded.forward(xor_inputs[i]);
+            cout << "  [" << xor_inputs[i][0] << "," << xor_inputs[i][1] 
+                 << "] → " << fixed << setprecision(4) << res[0] << "\n";
+        }
+    }
 
-    // создаем вторую сеть (тоже с логированием, но в другой файл)
-    NeuralNetwork net2({ 2, 3, 1 }, true, "network_log2.txt");
-
-    net2.loadModel("model.txt");
-
-    // проверяем что загрузилось
-    cout << "Веса после загрузки:\n";
-    net2.printLayers();
+    cout << "\n========================\n";
+    cout << "Работа завершена!\n";
 
     return 0;
 }
