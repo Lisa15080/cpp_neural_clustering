@@ -28,30 +28,31 @@ private:
                       size_t block_size) const;
 
 public:
-    // ==================== КОНСТРУКТОРЫ ====================
+    // КОНСТРУКТОРЫ
     Matrix();
     explicit Matrix(size_t rows, size_t cols, T init_value = T{});
     Matrix(std::initializer_list<std::initializer_list<T>> list);
+    //позволяет вводить данные методом Matrix<double> m = {{1, 2, 3}, {4, 5, 6}};
 
     // Rule of five
     Matrix(const Matrix& other) = default;
     Matrix(Matrix&& other) noexcept = default;
     Matrix& operator=(const Matrix& other) = default;
     Matrix& operator=(Matrix&& other) noexcept = default;
-    Matrix& operator=(std::initializer_list<std::initializer_list<T>> list);
-
     ~Matrix() = default;
 
-    // ==================== GETTERS ====================
+    Matrix& operator=(std::initializer_list<std::initializer_list<T>> list);
+
+    // ГЕТТЕРЫ
     size_t rows() const { return rows_; }
     size_t cols() const { return cols_; }
     size_t size() const { return data_.size(); }
 
-    // ==================== ДОСТУП К ЭЛЕМЕНТАМ ====================
+    //  ДОСТУП К ЭЛЕМЕНТАМ
     T& operator()(size_t i, size_t j);
     const T& operator()(size_t i, size_t j) const;
 
-    // ==================== МЕТОДЫ ДЛЯ ЗАПОЛНЕНИЯ ====================
+    // МЕТОДЫ ДЛЯ ЗАПОЛНЕНИЯ
     Matrix& set(size_t i, size_t j, T value);
     Matrix& setRow(size_t row, const std::vector<T>& values);
     Matrix& setRow(size_t row, std::initializer_list<T> values);
@@ -62,18 +63,18 @@ public:
     Matrix& setDiagonal(const std::vector<T>& values);
     Matrix& setDiagonal(T value);
 
-    // ==================== БАЗОВЫЕ ОПЕРАЦИИ ====================
+    // БАЗОВЫЕ ОПЕРАЦИИ
     void fill(T value);
     Matrix transpose() const;
     Matrix multiply(const Matrix& other) const;
-    Matrix operator*(const Matrix& other) const;
+    Matrix operator*(const Matrix& other) const;//Это позволяет писать C = A * B
     Matrix& operator*=(const Matrix& other);
 
-    // ==================== СТАТИЧЕСКИЕ МЕТОДЫ ====================
+    // для тестов
     static Matrix identity(size_t n);
     static Matrix random(size_t rows, size_t cols, T min = T{-1}, T max = T{1});
 
-    // ==================== ДРУЗЬЯ ====================
+    // функции доступа к privat перменным
     template<typename U>
     friend std::ostream& operator<<(std::ostream& os, const Matrix<U>& mat);
 
@@ -81,14 +82,14 @@ public:
     friend Matrix<U> multiplyWithTranspose(const Matrix<U>& a, const Matrix<U>& b);
 };
 
-// ==================== СВОБОДНЫЕ ФУНКЦИИ (declarations) ====================
+//  СВОБОДНЫЕ ФУНКЦИ
 template<typename T>
 std::ostream& operator<<(std::ostream& os, const Matrix<T>& mat);
 
 template<typename T>
 Matrix<T> multiplyWithTranspose(const Matrix<T>& a, const Matrix<T>& b);
 
-// ==================== ПОДКЛЮЧЕНИЕ РЕАЛИЗАЦИИ ====================
+// ПОДКЛЮЧЕНИЕ РЕАЛИЗАЦИИ
 #include "matrix.cpp"
 
 #endif // MATRIX_H

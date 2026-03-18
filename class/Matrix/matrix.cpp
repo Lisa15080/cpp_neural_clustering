@@ -3,7 +3,7 @@
 
 #include "matrix.h"
 
-// ==================== КОНСТРУКТОРЫ ====================
+//  КОНСТРУКТОРЫ
 
 template<typename T>
 Matrix<T>::Matrix() : rows_(0), cols_(0) {}
@@ -42,7 +42,7 @@ Matrix<T>& Matrix<T>::operator=(std::initializer_list<std::initializer_list<T>> 
     return *this;
 }
 
-// ==================== ДОСТУП К ЭЛЕМЕНТАМ ====================
+//ДОСТУП К ЭЛЕМЕНТАМ
 
 template<typename T>
 T& Matrix<T>::operator()(size_t i, size_t j) {
@@ -60,8 +60,7 @@ const T& Matrix<T>::operator()(size_t i, size_t j) const {
     return data_[i * cols_ + j];
 }
 
-// ==================== МЕТОДЫ ЗАПОЛНЕНИЯ ====================
-
+// МЕТОДЫ ЗАПОЛНЕНИЯ
 template<typename T>
 Matrix<T>& Matrix<T>::set(size_t i, size_t j, T value) {
     (*this)(i, j) = value;
@@ -136,7 +135,7 @@ Matrix<T>& Matrix<T>::setDiagonal(T value) {
     return *this;
 }
 
-// ==================== БАЗОВЫЕ ОПЕРАЦИИ ====================
+// БАЗОВЫЕ ОПЕРАЦИИ
 
 template<typename T>
 void Matrix<T>::fill(T value) {
@@ -154,8 +153,8 @@ Matrix<T> Matrix<T>::transpose() const {
     return result;
 }
 
-// ==================== УМНОЖЕНИЕ ====================
-
+// УМНОЖЕНИЕ
+//Вспомогательный метод
 template<typename T>
 void Matrix<T>::multiplyBlock(const Matrix& other, Matrix& result,
                              size_t start_i, size_t start_j, size_t start_k,
@@ -225,7 +224,7 @@ Matrix<T>& Matrix<T>::operator*=(const Matrix& other) {
     return *this;
 }
 
-// ==================== СТАТИЧЕСКИЕ МЕТОДЫ ====================
+//  СТАТИЧЕСКИЕ МЕТОДЫ
 
 template<typename T>
 Matrix<T> Matrix<T>::identity(size_t n) {
@@ -236,7 +235,7 @@ Matrix<T> Matrix<T>::identity(size_t n) {
     return result;
 }
 
-// Вспомогательные функции для random
+// для тестов
 namespace {
     template<typename T>
     typename std::enable_if<std::is_integral<T>::value, void>::type
@@ -282,8 +281,8 @@ Matrix<T> Matrix<T>::random(size_t rows, size_t cols, T min, T max) {
     return result;
 }
 
-// ==================== СВОБОДНЫЕ ФУНКЦИИ ====================
-
+//СВОБОДНЫЕ ФУНКЦИИ
+//оператор вывода
 template<typename T>
 std::ostream& operator<<(std::ostream& os, const Matrix<T>& mat) {
     for (size_t i = 0; i < mat.rows_; ++i) {
@@ -296,7 +295,7 @@ std::ostream& operator<<(std::ostream& os, const Matrix<T>& mat) {
     }
     return os;
 }
-
+//для матрицы грамма, вычисления коварционной матрицы
 template<typename T>
 Matrix<T> multiplyWithTranspose(const Matrix<T>& a, const Matrix<T>& b) {
     Matrix<T> bt = b.transpose();
@@ -317,7 +316,7 @@ Matrix<T> multiplyWithTranspose(const Matrix<T>& a, const Matrix<T>& b) {
     return result;
 }
 
-// ==================== ЯВНАЯ ИНСТАНЦИАЦИЯ ====================
+// ЯВНАЯ ИНСТАНЦИАЦИЯ
 template class Matrix<double>;
 template class Matrix<float>;
 template class Matrix<int>;

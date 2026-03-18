@@ -85,7 +85,6 @@ TYPED_TEST(MatrixTest, InitializerListConstructor) {
 }
 
 TYPED_TEST(MatrixTest, InitializerListConstructorInvalid) {
-    // ИСПРАВЛЕНО: EXPECT_THROW с правильным синтаксисом
     EXPECT_THROW(
         Matrix<TypeParam>({
             {1, 2, 3},
