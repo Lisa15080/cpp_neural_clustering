@@ -3,9 +3,7 @@
 #include <cstdlib>
 #include <ctime>
 #include <cstddef>
-#ifndef M_PI
-#define M_PI 3.14159265358979323846
-#endif
+#include <numbers>
 
 // Функция для генерации случайного числа из нормального распределения
 // Используем простую формулу (сумма равномерных случайных чисел)
@@ -29,33 +27,22 @@ Dataset DatasetGenerator::generate_gaussian(size_t n_samples,
     
     size_t n_per_class = n_samples / 2;  // Половина точек в каждом кластере
     
-    // ===== Кластер 1 (класс 0) =====
-    // Центр кластера справа: (separation/2, 0)
-    double center1_x = separation / 2.0;
-    double center1_y = 0.0;
+    // Лямбда-функция для генерации одного кластера
+    // Захватываем по ссылке: data, n_per_class, cluster_std
+    auto generate_cluster = [&](double center_x, double center_y, double label) {
+        for (size_t i = 0; i < n_per_class; i++) {
+            double x = gaussian_random(center_x, cluster_std);
+            double y = gaussian_random(center_y, cluster_std);
+            data.inputs.push_back({x, y});
+            data.targets.push_back({label});
+        }
+    };
     
-    for (size_t i = 0; i < n_per_class; i++) {
-        // Генерируем точку с гауссовым разбросом вокруг центра
-        double x = gaussian_random(center1_x, cluster_std);
-        double y = gaussian_random(center1_y, cluster_std);
-        
-        // Добавляем в датасет
-        data.inputs.push_back({x, y});
-        data.targets.push_back({0.0});  // Метка класса 0
-    }
-    
-    // ===== Кластер 2 (класс 1) =====
-    // Центр кластера слева: (-separation/2, 0)
-    double center2_x = -separation / 2.0;
-    double center2_y = 0.0;
-    
-    for (size_t i = 0; i < n_per_class; i++) {
-        double x = gaussian_random(center2_x, cluster_std);
-        double y = gaussian_random(center2_y, cluster_std);
-        
-        data.inputs.push_back({x, y});
-        data.targets.push_back({1.0});  // Метка класса 1
-    }
+    // Генерация двух кластеров 
+    // Кластер 1 (класс 0): центр справа (separation/2, 0)
+    generate_cluster(separation / 2.0, 0.0, 0.0);
+    // Кластер 2 (класс 1): центр слева (-separation/2, 0)
+    generate_cluster(-separation / 2.0, 0.0, 1.0);
     
     return data;
 }

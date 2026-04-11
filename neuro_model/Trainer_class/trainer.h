@@ -6,6 +6,7 @@
 #include "../../class/Matrix/matrix.h"
 #include <vector>
 #include <iostream>
+#include <functional>
 
 // Настройки обучения
 struct TrainingConfig {
@@ -47,7 +48,7 @@ public:
 
     // ========== МЕТОДЫ ОБУЧЕНИЯ ==========
 
-    // Обучение на матрицах (ОСНОВНОЙ МЕТОД)
+    // Обучение на матрицах
     void train(const Matrix<double>& inputs, const Matrix<double>& targets);
 
     // Обучение на данных из Dataset (конвертирует в матрицы)
@@ -61,7 +62,7 @@ public:
 
     // ========== МЕТОДЫ ОЦЕНКИ ==========
 
-    // Оценка точности на матрицах (ОСНОВНОЙ МЕТОД)
+    // Оценка точности на матрицах
     double evaluate(const Matrix<double>& inputs, const Matrix<double>& targets) const;
 
     // Оценка точности на Dataset
