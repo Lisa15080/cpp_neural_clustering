@@ -50,55 +50,88 @@ double CSVParser::parseDouble(const std::string& token, size_t row, size_t col) 
     }
 }
 
+// Проверка валидности индексов колонок
+void CSVParser::validateColumns(const Matrix<double>& matrix,
+                                 const std::vector<int>& columns,
+                                 const std::string& context) const {
+    size_t max_col = matrix.cols();
+    for (int col : columns) {
+        if (col < 0 || static_cast<size_t>(col) >= max_col) {
+            throw std::runtime_error(
+                context + " column index " + std::to_string(col) +
+                " is out of range (max: " + std::to_string(max_col - 1) + ")"
+            );
+        }
+    }
+}
+
+// Извлечение колонок из матрицы
+Matrix<double> CSVParser::extractColumns(const Matrix<double>& source,
+                                          const std::vector<int>& columns) const {
+    if (columns.empty()) {
+        return Matrix<double>();
+    }
+
+    Matrix<double> result(source.rows(), columns.size());
+
+    for (size_t i = 0; i < source.rows(); ++i) {
+        for (size_t j = 0; j < columns.size(); ++j) {
+            result(i, j) = source(i, columns[j]);
+        }
+    }
+
+    return result;
+}
+
 // Загрузка всего CSV файла в матрицу
 Matrix<double> CSVParser::loadToMatrix(const std::string& filename) const {
     std::ifstream file(filename);
     if (!file.is_open()) {
         throw std::runtime_error("Cannot open file: " + filename);
     }
-    
+
     std::vector<std::vector<double>> data;
     std::string line;
     size_t expected_cols = 0;
     size_t row_count = 0;
-    
+
     // Пропускаем заголовок, если он есть
     if (has_header_) {
         std::getline(file, line);
     }
-    
+
     // Читаем данные
     while (std::getline(file, line)) {
         if (line.empty()) continue;  // Пропускаем пустые строки
-        
+
         auto tokens = splitLine(line);
-        
+
         // Проверяем количество колонок
         if (expected_cols == 0) {
             expected_cols = tokens.size();
         } else if (tokens.size() != expected_cols) {
             throw std::runtime_error(
-                "CSV error at row " + std::to_string(row_count + 1) + 
-                ": expected " + std::to_string(expected_cols) + 
+                "CSV error at row " + std::to_string(row_count + 1) +
+                ": expected " + std::to_string(expected_cols) +
                 " columns, got " + std::to_string(tokens.size())
             );
         }
-        
+
         std::vector<double> row;
         for (size_t j = 0; j < tokens.size(); ++j) {
             row.push_back(parseDouble(tokens[j], row_count + 1, j + 1));
         }
-        
+
         data.push_back(row);
         row_count++;
     }
-    
+
     file.close();
-    
+
     if (data.empty()) {
         return Matrix<double>();  // Возвращаем пустую матрицу
     }
-    
+
     // Преобразуем vector<vector<double>> в Matrix<double>
     Matrix<double> result(data.size(), data[0].size());
     for (size_t i = 0; i < data.size(); ++i) {
@@ -106,7 +139,7 @@ Matrix<double> CSVParser::loadToMatrix(const std::string& filename) const {
             result(i, j) = data[i][j];
         }
     }
-    
+
     return result;
 }
 
@@ -118,74 +151,45 @@ Dataset<double> CSVParser::loadTrainingData(
 ) const {
     // Загружаем все данные в матрицу
     Matrix<double> all_data = loadToMatrix(filename);
-    
+
     if (all_data.rows() == 0) {
         return Dataset<double>();  // Пустой датасет
     }
-    
+
     // Проверяем индексы колонок
-    size_t max_col = all_data.cols();
-    for (int col : input_columns) {
-        if (col < 0 || static_cast<size_t>(col) >= max_col) {
-            throw std::runtime_error(
-                "Input column index " + std::to_string(col) + 
-                " is out of range (max: " + std::to_string(max_col - 1) + ")"
-            );
-        }
-    }
-    for (int col : target_columns) {
-        if (col < 0 || static_cast<size_t>(col) >= max_col) {
-            throw std::runtime_error(
-                "Target column index " + std::to_string(col) + 
-                " is out of range (max: " + std::to_string(max_col - 1) + ")"
-            );
-        }
-    }
-    
+    validateColumns(all_data, input_columns, "Input");
+    validateColumns(all_data, target_columns, "Target");
+
     // Создаем матрицы для inputs и targets
-    Matrix<double> inputs(all_data.rows(), input_columns.size());
-    Matrix<double> targets(all_data.rows(), target_columns.size());
-    
-    // Заполняем inputs
-    for (size_t i = 0; i < all_data.rows(); ++i) {
-        for (size_t j = 0; j < input_columns.size(); ++j) {
-            inputs(i, j) = all_data(i, input_columns[j]);
-        }
-    }
-    
-    // Заполняем targets
-    for (size_t i = 0; i < all_data.rows(); ++i) {
-        for (size_t j = 0; j < target_columns.size(); ++j) {
-            targets(i, j) = all_data(i, target_columns[j]);
-        }
-    }
-    
+    Matrix<double> inputs = extractColumns(all_data, input_columns);
+    Matrix<double> targets = extractColumns(all_data, target_columns);
+
     // Получаем заголовки, если есть
     std::vector<std::string> headers;
     if (has_header_) {
         headers = getHeaders(filename);
     }
-    
+
     return {inputs, targets, headers};
 }
 
 // Загрузка с автоматическим определением (последняя колонка - цель)
 Dataset<double> CSVParser::loadTrainingDataAuto(const std::string& filename) const {
     Matrix<double> all_data = loadToMatrix(filename);
-    
+
     if (all_data.rows() == 0 || all_data.cols() < 2) {
         throw std::runtime_error(
             "Not enough columns for auto-detection. Need at least 2 columns."
         );
     }
-    
+
     std::vector<int> input_columns;
     for (size_t i = 0; i < all_data.cols() - 1; ++i) {
         input_columns.push_back(static_cast<int>(i));
     }
-    
+
     std::vector<int> target_columns = {static_cast<int>(all_data.cols() - 1)};
-    
+
     return loadTrainingData(filename, input_columns, target_columns);
 }
 
@@ -195,20 +199,12 @@ Matrix<double> CSVParser::loadInputsOnly(
     const std::vector<int>& input_columns
 ) const {
     Matrix<double> all_data = loadToMatrix(filename);
-    
+
     if (all_data.rows() == 0 || input_columns.empty()) {
         return Matrix<double>();
     }
-    
-    Matrix<double> inputs(all_data.rows(), input_columns.size());
-    
-    for (size_t i = 0; i < all_data.rows(); ++i) {
-        for (size_t j = 0; j < input_columns.size(); ++j) {
-            inputs(i, j) = all_data(i, input_columns[j]);
-        }
-    }
-    
-    return inputs;
+
+    return extractColumns(all_data, input_columns);
 }
 
 // Получить заголовки колонок

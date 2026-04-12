@@ -5,15 +5,17 @@
 
 //  КОНСТРУКТОРЫ
 
-template<typename T>
+template<MatrixElement T>
 Matrix<T>::Matrix() : rows_(0), cols_(0) {}
 
-template<typename T>
+template<MatrixElement T>
 Matrix<T>::Matrix(size_t rows, size_t cols, T init_value)
     : rows_(rows), cols_(cols), data_(rows * cols, init_value) {}
 
-template<typename T>
-Matrix<T>::Matrix(std::initializer_list<std::initializer_list<T>> list) {
+template<MatrixElement T>
+template<typename U>
+requires std::convertible_to<U, T>
+Matrix<T>::Matrix(std::initializer_list<std::initializer_list<U>> list) {
     rows_ = list.size();
     if (rows_ == 0) {
         cols_ = 0;
@@ -29,22 +31,24 @@ Matrix<T>::Matrix(std::initializer_list<std::initializer_list<T>> list) {
             throw std::invalid_argument("All rows must have the same size");
         }
         size_t j = 0;
-        for (const T& val : row) {
-            (*this)(i, j++) = val;
+        for (const U& val : row) {
+            (*this)(i, j++) = static_cast<T>(val);
         }
         ++i;
     }
 }
 
-template<typename T>
-Matrix<T>& Matrix<T>::operator=(std::initializer_list<std::initializer_list<T>> list) {
+template<MatrixElement T>
+template<typename U>
+requires std::convertible_to<U, T>
+Matrix<T>& Matrix<T>::operator=(std::initializer_list<std::initializer_list<U>> list) {
     *this = Matrix<T>(list);
     return *this;
 }
 
-//ДОСТУП К ЭЛЕМЕНТАМ
+// ДОСТУП К ЭЛЕМЕНТАМ
 
-template<typename T>
+template<MatrixElement T>
 T& Matrix<T>::operator()(size_t i, size_t j) {
     if (i >= rows_ || j >= cols_) {
         throw std::out_of_range("Matrix index out of range");
@@ -52,7 +56,7 @@ T& Matrix<T>::operator()(size_t i, size_t j) {
     return data_[i * cols_ + j];
 }
 
-template<typename T>
+template<MatrixElement T>
 const T& Matrix<T>::operator()(size_t i, size_t j) const {
     if (i >= rows_ || j >= cols_) {
         throw std::out_of_range("Matrix index out of range");
@@ -61,72 +65,96 @@ const T& Matrix<T>::operator()(size_t i, size_t j) const {
 }
 
 // МЕТОДЫ ЗАПОЛНЕНИЯ
-template<typename T>
+template<MatrixElement T>
 Matrix<T>& Matrix<T>::set(size_t i, size_t j, T value) {
     (*this)(i, j) = value;
     return *this;
 }
 
-template<typename T>
-Matrix<T>& Matrix<T>::setRow(size_t row, const std::vector<T>& values) {
+template<MatrixElement T>
+template<typename U>
+requires std::convertible_to<U, T>
+Matrix<T>& Matrix<T>::setRow(size_t row, const std::vector<U>& values) {
+    if (row >= rows_) {
+        throw std::out_of_range("Row index out of range");
+    }
     if (values.size() != cols_) {
         throw std::invalid_argument("Row size mismatch: expected " +
                                   std::to_string(cols_) + ", got " +
                                   std::to_string(values.size()));
     }
     for (size_t j = 0; j < cols_; ++j) {
-        (*this)(row, j) = values[j];
+        (*this)(row, j) = static_cast<T>(values[j]);
     }
     return *this;
 }
 
-template<typename T>
-Matrix<T>& Matrix<T>::setRow(size_t row, std::initializer_list<T> values) {
-    return setRow(row, std::vector<T>(values));
+template<MatrixElement T>
+template<typename U>
+requires std::convertible_to<U, T>
+Matrix<T>& Matrix<T>::setRow(size_t row, std::initializer_list<U> values) {
+    return setRow(row, std::vector<U>(values));
 }
 
-template<typename T>
-Matrix<T>& Matrix<T>::setCol(size_t col, const std::vector<T>& values) {
+template<MatrixElement T>
+template<typename U>
+requires std::convertible_to<U, T>
+Matrix<T>& Matrix<T>::setCol(size_t col, const std::vector<U>& values) {
+    if (col >= cols_) {
+        throw std::out_of_range("Column index out of range");
+    }
     if (values.size() != rows_) {
         throw std::invalid_argument("Column size mismatch: expected " +
                                   std::to_string(rows_) + ", got " +
                                   std::to_string(values.size()));
     }
     for (size_t i = 0; i < rows_; ++i) {
-        (*this)(i, col) = values[i];
+        (*this)(i, col) = static_cast<T>(values[i]);
     }
     return *this;
 }
 
-template<typename T>
-Matrix<T>& Matrix<T>::setCol(size_t col, std::initializer_list<T> values) {
-    return setCol(col, std::vector<T>(values));
+template<MatrixElement T>
+template<typename U>
+requires std::convertible_to<U, T>
+Matrix<T>& Matrix<T>::setCol(size_t col, std::initializer_list<U> values) {
+    return setCol(col, std::vector<U>(values));
 }
 
-template<typename T>
-Matrix<T>& Matrix<T>::setAll(const std::vector<T>& values) {
+template<MatrixElement T>
+template<typename U>
+requires std::convertible_to<U, T>
+Matrix<T>& Matrix<T>::setAll(const std::vector<U>& values) {
     if (values.size() != rows_ * cols_) {
-        throw std::invalid_argument("Values size mismatch");
+        throw std::invalid_argument("Values size mismatch: expected " +
+                                  std::to_string(rows_ * cols_) + ", got " +
+                                  std::to_string(values.size()));
     }
-    data_ = values;
+    for (size_t i = 0; i < rows_ * cols_; ++i) {
+        data_[i] = static_cast<T>(values[i]);
+    }
     return *this;
 }
 
-template<typename T>
-Matrix<T>& Matrix<T>::setAll(std::initializer_list<T> values) {
-    return setAll(std::vector<T>(values));
+template<MatrixElement T>
+template<typename U>
+requires std::convertible_to<U, T>
+Matrix<T>& Matrix<T>::setAll(std::initializer_list<U> values) {
+    return setAll(std::vector<U>(values));
 }
 
-template<typename T>
-Matrix<T>& Matrix<T>::setDiagonal(const std::vector<T>& values) {
+template<MatrixElement T>
+template<typename U>
+requires std::convertible_to<U, T>
+Matrix<T>& Matrix<T>::setDiagonal(const std::vector<U>& values) {
     size_t n = std::min({rows_, cols_, values.size()});
     for (size_t i = 0; i < n; ++i) {
-        (*this)(i, i) = values[i];
+        (*this)(i, i) = static_cast<T>(values[i]);
     }
     return *this;
 }
 
-template<typename T>
+template<MatrixElement T>
 Matrix<T>& Matrix<T>::setDiagonal(T value) {
     size_t n = std::min(rows_, cols_);
     for (size_t i = 0; i < n; ++i) {
@@ -137,12 +165,12 @@ Matrix<T>& Matrix<T>::setDiagonal(T value) {
 
 // БАЗОВЫЕ ОПЕРАЦИИ
 
-template<typename T>
+template<MatrixElement T>
 void Matrix<T>::fill(T value) {
     std::fill(data_.begin(), data_.end(), value);
 }
 
-template<typename T>
+template<MatrixElement T>
 Matrix<T> Matrix<T>::transpose() const {
     Matrix<T> result(cols_, rows_);
     for (size_t i = 0; i < rows_; ++i) {
@@ -154,8 +182,8 @@ Matrix<T> Matrix<T>::transpose() const {
 }
 
 // УМНОЖЕНИЕ
-//Вспомогательный метод
-template<typename T>
+// Вспомогательный метод
+template<MatrixElement T>
 void Matrix<T>::multiplyBlock(const Matrix& other, Matrix& result,
                              size_t start_i, size_t start_j, size_t start_k,
                              size_t block_size) const {
@@ -175,7 +203,7 @@ void Matrix<T>::multiplyBlock(const Matrix& other, Matrix& result,
     }
 }
 
-template<typename T>
+template<MatrixElement T>
 Matrix<T> Matrix<T>::multiply(const Matrix& other) const {
     if (cols_ != other.rows_) {
         throw std::invalid_argument("Matrix dimensions mismatch for multiplication");
@@ -213,12 +241,12 @@ Matrix<T> Matrix<T>::multiply(const Matrix& other) const {
     return result;
 }
 
-template<typename T>
+template<MatrixElement T>
 Matrix<T> Matrix<T>::operator*(const Matrix& other) const {
     return multiply(other);
 }
 
-template<typename T>
+template<MatrixElement T>
 Matrix<T>& Matrix<T>::operator*=(const Matrix& other) {
     *this = multiply(other);
     return *this;
@@ -226,7 +254,7 @@ Matrix<T>& Matrix<T>::operator*=(const Matrix& other) {
 
 //  СТАТИЧЕСКИЕ МЕТОДЫ
 
-template<typename T>
+template<MatrixElement T>
 Matrix<T> Matrix<T>::identity(size_t n) {
     Matrix<T> result(n, n, T{});
     for (size_t i = 0; i < n; ++i) {
@@ -235,80 +263,83 @@ Matrix<T> Matrix<T>::identity(size_t n) {
     return result;
 }
 
-// для тестов
-namespace {
-    template<typename T>
-    typename std::enable_if<std::is_integral<T>::value, void>::type
-    fill_random_impl(std::vector<T>& data, size_t size, T min, T max) {
-        static std::random_device rd;
-        static std::mt19937 gen(rd());
-        std::uniform_int_distribution<T> dis(min, max);
+// Вспомогательные функции для random с использованием концептов
+template<MatrixElement T>
+requires std::is_integral_v<T>
+void fill_random_impl(std::vector<T>& data, size_t size, T min, T max) {
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    std::uniform_int_distribution<T> dis(min, max);
 
-        for (size_t i = 0; i < size; ++i) {
-            data[i] = dis(gen);
-        }
-    }
-
-    template<typename T>
-    typename std::enable_if<std::is_floating_point<T>::value, void>::type
-    fill_random_impl(std::vector<T>& data, size_t size, T min, T max) {
-        static std::random_device rd;
-        static std::mt19937 gen(rd());
-        std::uniform_real_distribution<T> dis(min, max);
-
-        for (size_t i = 0; i < size; ++i) {
-            data[i] = dis(gen);
-        }
-    }
-
-    template<typename T>
-    typename std::enable_if<!std::is_integral<T>::value && !std::is_floating_point<T>::value, void>::type
-    fill_random_impl(std::vector<T>& data, size_t size, T min, T max) {
-        static std::random_device rd;
-        static std::mt19937 gen(rd());
-        std::uniform_int_distribution<int> dis(static_cast<int>(min), static_cast<int>(max));
-
-        for (size_t i = 0; i < size; ++i) {
-            data[i] = static_cast<T>(dis(gen));
-        }
+    for (size_t i = 0; i < size; ++i) {
+        data[i] = dis(gen);
     }
 }
 
-template<typename T>
+template<MatrixElement T>
+requires std::is_floating_point_v<T>
+void fill_random_impl(std::vector<T>& data, size_t size, T min, T max) {
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    std::uniform_real_distribution<T> dis(min, max);
+
+    for (size_t i = 0; i < size; ++i) {
+        data[i] = dis(gen);
+    }
+}
+
+template<MatrixElement T>
+requires (!std::is_integral_v<T> && !std::is_floating_point_v<T>)
+void fill_random_impl(std::vector<T>& data, size_t size, T min, T max) {
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    // Для нечисловых типов пытаемся преобразовать из int
+    std::uniform_int_distribution<int> dis(static_cast<int>(min), static_cast<int>(max));
+
+    for (size_t i = 0; i < size; ++i) {
+        data[i] = static_cast<T>(dis(gen));
+    }
+}
+
+template<MatrixElement T>
 Matrix<T> Matrix<T>::random(size_t rows, size_t cols, T min, T max) {
     Matrix<T> result(rows, cols);
     fill_random_impl(result.data_, rows * cols, min, max);
     return result;
 }
 
-//СВОБОДНЫЕ ФУНКЦИИ
-//оператор вывода
-template<typename T>
+// СВОБОДНЫЕ ФУНКЦИИ
+// оператор вывода
+template<MatrixElement T>
 std::ostream& operator<<(std::ostream& os, const Matrix<T>& mat) {
-    for (size_t i = 0; i < mat.rows_; ++i) {
+    for (size_t i = 0; i < mat.rows(); ++i) {
         os << "[";
-        for (size_t j = 0; j < mat.cols_; ++j) {
+        for (size_t j = 0; j < mat.cols(); ++j) {
             os << std::setw(10) << std::setprecision(4) << mat(i, j);
-            if (j < mat.cols_ - 1) os << ", ";
+            if (j < mat.cols() - 1) os << ", ";
         }
         os << "]\n";
     }
     return os;
 }
-//для матрицы грамма, вычисления коварционной матрицы
-template<typename T>
+
+// для матрицы грамма, вычисления ковариационной матрицы
+template<MatrixElement T>
 Matrix<T> multiplyWithTranspose(const Matrix<T>& a, const Matrix<T>& b) {
-    Matrix<T> bt = b.transpose();
-    Matrix<T> result(a.rows(), b.cols());
+    if (a.cols() != b.cols()) {
+        throw std::invalid_argument("Matrices must have same number of columns for AT * B");
+    }
+
+    Matrix<T> result(a.rows(), b.rows());
 
     #ifdef _OPENMP
     #pragma omp parallel for collapse(2)
     #endif
     for (size_t i = 0; i < a.rows(); ++i) {
-        for (size_t j = 0; j < b.cols(); ++j) {
+        for (size_t j = 0; j < b.rows(); ++j) {
             T sum = T{};
             for (size_t k = 0; k < a.cols(); ++k) {
-                sum += a(i, k) * bt(j, k);
+                sum += a(i, k) * b(j, k);
             }
             result(i, j) = sum;
         }

@@ -16,7 +16,24 @@
 #include <omp.h>
 #endif
 
-template<typename T = double>
+// КОНЦЕПТЫ
+template<typename T>
+concept Arithmetic = std::is_arithmetic_v<T>;
+
+template<typename T>
+concept Multipliable = requires(T a, T b) {
+    { a * b } -> std::convertible_to<T>;
+};
+
+template<typename T>
+concept Addable = requires(T a, T b) {
+    { a + b } -> std::convertible_to<T>;
+};
+
+template<typename T>
+concept MatrixElement = Arithmetic<T> && Multipliable<T> && Addable<T>;
+
+template<MatrixElement T = double>
 class Matrix {
 private:
     std::vector<T> data_;
@@ -31,8 +48,10 @@ public:
     // КОНСТРУКТОРЫ
     Matrix();
     explicit Matrix(size_t rows, size_t cols, T init_value = T{});
-    Matrix(std::initializer_list<std::initializer_list<T>> list);
-    //позволяет вводить данные методом Matrix<double> m = {{1, 2, 3}, {4, 5, 6}};
+
+    template<typename U>
+    requires std::convertible_to<U, T>
+    Matrix(std::initializer_list<std::initializer_list<U>> list);
 
     // Rule of five
     Matrix(const Matrix& other) = default;
@@ -41,40 +60,71 @@ public:
     Matrix& operator=(Matrix&& other) noexcept = default;
     ~Matrix() = default;
 
-    Matrix& operator=(std::initializer_list<std::initializer_list<T>> list);
+    template<typename U>
+    requires std::convertible_to<U, T>
+    Matrix& operator=(std::initializer_list<std::initializer_list<U>> list);
 
     // ГЕТТЕРЫ
     size_t rows() const { return rows_; }
     size_t cols() const { return cols_; }
     size_t size() const { return data_.size(); }
 
-    //  ДОСТУП К ЭЛЕМЕНТАМ
+    // ДОСТУП К ЭЛЕМЕНТАМ
     T& operator()(size_t i, size_t j);
     const T& operator()(size_t i, size_t j) const;
 
     // МЕТОДЫ ДЛЯ ЗАПОЛНЕНИЯ
     Matrix& set(size_t i, size_t j, T value);
-    Matrix& setRow(size_t row, const std::vector<T>& values);
-    Matrix& setRow(size_t row, std::initializer_list<T> values);
-    Matrix& setCol(size_t col, const std::vector<T>& values);
-    Matrix& setCol(size_t col, std::initializer_list<T> values);
-    Matrix& setAll(const std::vector<T>& values);
-    Matrix& setAll(std::initializer_list<T> values);
-    Matrix& setDiagonal(const std::vector<T>& values);
+
+    template<typename U>
+    requires std::convertible_to<U, T>
+    Matrix& setRow(size_t row, const std::vector<U>& values);
+
+    template<typename U>
+    requires std::convertible_to<U, T>
+    Matrix& setRow(size_t row, std::initializer_list<U> values);
+
+    template<typename U>
+    requires std::convertible_to<U, T>
+    Matrix& setCol(size_t col, const std::vector<U>& values);
+
+    template<typename U>
+    requires std::convertible_to<U, T>
+    Matrix& setCol(size_t col, std::initializer_list<U> values);
+
+    template<typename U>
+    requires std::convertible_to<U, T>
+    Matrix& setAll(const std::vector<U>& values);
+
+    template<typename U>
+    requires std::convertible_to<U, T>
+    Matrix& setAll(std::initializer_list<U> values);
+
+    template<typename U>
+    requires std::convertible_to<U, T>
+    Matrix& setDiagonal(const std::vector<U>& values);
+
+    // Перегрузка для initializer_list
+    template<typename U>
+    requires std::convertible_to<U, T>
+    Matrix& setDiagonal(std::initializer_list<U> values) {
+        return setDiagonal(std::vector<U>(values));
+    }
+
     Matrix& setDiagonal(T value);
 
     // БАЗОВЫЕ ОПЕРАЦИИ
     void fill(T value);
     Matrix transpose() const;
     Matrix multiply(const Matrix& other) const;
-    Matrix operator*(const Matrix& other) const;//Это позволяет писать C = A * B
+    Matrix operator*(const Matrix& other) const;
     Matrix& operator*=(const Matrix& other);
 
     // для тестов
     static Matrix identity(size_t n);
     static Matrix random(size_t rows, size_t cols, T min = T{-1}, T max = T{1});
 
-    // функции доступа к privat перменным
+    // функции доступа к privat переменным
     template<typename U>
     friend std::ostream& operator<<(std::ostream& os, const Matrix<U>& mat);
 
@@ -82,11 +132,11 @@ public:
     friend Matrix<U> multiplyWithTranspose(const Matrix<U>& a, const Matrix<U>& b);
 };
 
-//  СВОБОДНЫЕ ФУНКЦИ
-template<typename T>
+// СВОБОДНЫЕ ФУНКЦИИ
+template<MatrixElement T>
 std::ostream& operator<<(std::ostream& os, const Matrix<T>& mat);
 
-template<typename T>
+template<MatrixElement T>
 Matrix<T> multiplyWithTranspose(const Matrix<T>& a, const Matrix<T>& b);
 
 // ПОДКЛЮЧЕНИЕ РЕАЛИЗАЦИИ

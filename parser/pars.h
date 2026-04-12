@@ -20,6 +20,11 @@ class CSVParser {
 private:
     char delimiter_;       // Разделитель (по умолчанию ',')
     bool has_header_;      // Есть ли заголовок в первой строке
+    void validateColumns(const Matrix<double>& matrix,
+                        const std::vector<int>& columns,
+                        const std::string& context) const;
+    Matrix<double> extractColumns(const Matrix<double>& source,
+                                  const std::vector<int>& columns) const;
 
     // Вспомогательная функция для разбиения строки
     std::vector<std::string> splitLine(const std::string& line) const;
