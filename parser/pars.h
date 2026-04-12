@@ -7,7 +7,7 @@
 #include "matrix.h" // предполагая, что у вас есть класс Matrix
 
 template<typename T>
-struct Dataset {
+struct Datasetpars {
     Matrix<T> inputs;    // признаки (x, y координаты)
     Matrix<T> targets;   // метки классов (0, 1, 2, ...)
     std::vector<std::string> headers;
@@ -37,16 +37,16 @@ public:
     Matrix<double> loadToMatrix(const std::string& filename) const;
     
     // Специализированный метод для 2D классификации
-    Dataset<double> loadClassification2D(const std::string& filename) const;
+    Datasetpars<double> loadClassification2D(const std::string& filename) const;
     
     // Общие методы загрузки
-    Dataset<double> loadTrainingData(
+    Datasetpars<double> loadTrainingData(
         const std::string& filename,
         const std::vector<int>& input_columns,
         const std::vector<int>& target_columns
     ) const;
     
-    Dataset<double> loadTrainingDataAuto(const std::string& filename) const;
+    Datasetpars<double> loadTrainingDataAuto(const std::string& filename) const;
     Matrix<double> loadInputsOnly(const std::string& filename,
                                   const std::vector<int>& input_columns) const;
     

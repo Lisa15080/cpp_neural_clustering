@@ -174,7 +174,7 @@ Matrix<double> CSVParser::loadToMatrix(const std::string& filename) const {
 
 // СПЕЦИАЛИЗИРОВАННЫЙ МЕТОД ДЛЯ 2D КЛАССИФИКАЦИИ
 // Предполагает формат: x, y, class
-Dataset<double> CSVParser::loadClassification2D(const std::string& filename) const {
+Datasetpars<double> CSVParser::loadClassification2D(const std::string& filename) const {
     Matrix<double> all_data = loadToMatrix(filename);
     
     if (all_data.rows() == 0) {
@@ -203,7 +203,7 @@ Dataset<double> CSVParser::loadClassification2D(const std::string& filename) con
         }
     }
     
-    Dataset<double> result;
+    Datasetpars<double> result;
     result.inputs = extractColumns(all_data, input_cols);
     result.targets = extractColumns(all_data, target_cols);
     
@@ -234,7 +234,7 @@ Dataset<double> CSVParser::loadClassification2D(const std::string& filename) con
     return result;
 }
 
-Dataset<double> CSVParser::loadTrainingData(
+Datasetpars<double> CSVParser::loadTrainingData(
     const std::string& filename,
     const std::vector<int>& input_columns,
     const std::vector<int>& target_columns
@@ -242,13 +242,13 @@ Dataset<double> CSVParser::loadTrainingData(
     Matrix<double> all_data = loadToMatrix(filename);
 
     if (all_data.rows() == 0) {
-        return Dataset<double>();
+        return Datasetpars<double>();
     }
 
     validateColumns(all_data, input_columns, "Input");
     validateColumns(all_data, target_columns, "Target");
 
-    Dataset<double> result;
+    Datasetpars<double> result;
     result.inputs = extractColumns(all_data, input_columns);
     result.targets = extractColumns(all_data, target_columns);
 
@@ -260,7 +260,7 @@ Dataset<double> CSVParser::loadTrainingData(
 }
 
 // loadTrainingDataAuto метод (автоматическое определение: последняя колонка - цель)
-Dataset<double> CSVParser::loadTrainingDataAuto(const std::string& filename) const {
+Datasetpars<double> CSVParser::loadTrainingDataAuto(const std::string& filename) const {
     Matrix<double> all_data = loadToMatrix(filename);
 
     if (all_data.rows() == 0 || all_data.cols() < 2) {
