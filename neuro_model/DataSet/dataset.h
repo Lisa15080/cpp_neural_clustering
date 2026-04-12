@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <cstddef>
+
 // Структура для хранения данных
 struct Dataset {
     std::vector<std::vector<double>> inputs;   // Входные данные
