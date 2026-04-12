@@ -1,7 +1,8 @@
-#include "neuro_model/Neural_Net/neural_net.h"
+#include "Neural_Net/neural_net.h"
 #include "Trainer_class/trainer.h"
-#include "class/Matrix/matrix.h"
-#include "parser/pars.h"
+#include "../class/Matrix/matrix.h"
+#include "../parser/pars.h"
+#include "visualize.h"
 
 #include <iostream>
 #include <iomanip>
@@ -9,9 +10,13 @@
 #include <random>
 #include <numeric>
 #include <algorithm>
+#include <fstream>
+#include <string>
 
 #ifdef _WIN32
     #include <direct.h>
+#else
+    #include <unistd.h>
 #endif
 
 using namespace std;
@@ -29,7 +34,7 @@ string getCurrentPath() {
     return ".";
 }
 
-// Преобразовать Matrix<double> в vector<vector<double>> (нужно для Trainer)
+// Преобразовать Matrix<double> в vector<vector<double>>
 vector<vector<double>> matrixToVector(const Matrix<double>& mat) {
     vector<vector<double>> vec(mat.rows(), vector<double>(mat.cols()));
     for (size_t i = 0; i < mat.rows(); ++i)
@@ -46,15 +51,15 @@ struct DataSplit {
 
 // Функция разбиения матриц на обучающую и тестовую выборки
 DataSplit trainTestSplit(const Matrix<double>& X, const Matrix<double>& y,
-                         double test_ratio = 0.2, bool shuffle = true) {
+                         double test_ratio = 0.2, bool do_shuffle = true) {
     size_t n = X.rows();
     vector<size_t> indices(n);
     iota(indices.begin(), indices.end(), 0);   // 0, 1, 2, ..., n-1
 
-    if (shuffle) {
+    if (do_shuffle) {
         random_device rd;
         mt19937 g(rd());
-        shuffle(indices.begin(), indices.end(), g);
+        std::shuffle(indices.begin(), indices.end(), g);
     }
 
     size_t test_size = static_cast<size_t>(n * test_ratio);
@@ -78,6 +83,11 @@ DataSplit trainTestSplit(const Matrix<double>& X, const Matrix<double>& y,
     return {X_train, X_test, y_train, y_test};
 }
 
+void save_clusters_json(const string& filename, 
+                        const vector<double>& X, 
+                        const vector<double>& Y, 
+                        const vector<int>& labels);
+
 // Главная программа
 int main() {
     cout << "=== Нейронная сеть + Trainer ===\n";
@@ -85,8 +95,8 @@ int main() {
 
     // Загрузка данных из CSV
     cout << "[1] Загрузка данных из CSV...\n";
-    CSVParser parser(',', true);   // разделитель запятая, первая строка – заголовок
-    string filename = "Kegal_dataset/circles_dataset.csv";   // путь к реальному файлу
+    CSVParser parser(',', true);
+    string filename = "../kaggle_dataset/circles_dataset.csv";
 
     try {
         // Загружаем данные для 2D классификации (формат: x, y, class)
@@ -142,9 +152,23 @@ int main() {
                  << ", предсказанный класс: " << pred << "\n";
         }
 
+        save_true_clusters_json("true_clusters.json", csv_dataset.inputs, csv_dataset.targets);
+        save_predictions_json("predictions.json", csv_dataset.inputs, trainer);
+        cout << "[+] Визуализация: true_clusters.json, predictions.json → python3 plot.py\n";
+
         // Сохраняем обученную модель
         net.saveModel("trained_model.txt");
         cout << "\nМодель сохранена в файл: trained_model.txt\n";
+
+        vector<double> X, Y;
+        vector<int> L;
+        for(size_t i=0; i<csv_dataset.inputs.rows(); ++i) {
+            X.push_back(csv_dataset.inputs(i, 0));
+            Y.push_back(csv_dataset.inputs(i, 1));
+            L.push_back(static_cast<int>(csv_dataset.targets(i, 0)));
+        }
+        save_clusters_json("clusters.json", X, Y, L);
+        cout << "\n[+] Данные сохранены. Запусти: python3 plot.py\n";
 
     } catch (const exception& e) {
         cerr << "Ошибка при работе с CSV: " << e.what() << "\n";
@@ -196,5 +220,20 @@ int main() {
     }
 
     cout << "\n=== Программа завершена ===\n";
+
     return 0;
+}
+
+void save_clusters_json(const string& filename, 
+                        const vector<double>& X, 
+                        const vector<double>& Y, 
+                        const vector<int>& labels) {
+    ofstream f(filename);
+    f << "{\"x\": [";
+    for(size_t i=0; i<X.size(); ++i) f << (i?",":"") << X[i];
+    f << "], \"y\": [";
+    for(size_t i=0; i<Y.size(); ++i) f << (i?",":"") << Y[i];
+    f << "], \"labels\": [";
+    for(size_t i=0; i<labels.size(); ++i) f << (i?",":"") << labels[i];
+    f << "]}";
 }
