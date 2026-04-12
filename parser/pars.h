@@ -1,68 +1,67 @@
+// pars.h - обновленный заголовочный файл
 #ifndef PARS_H
 #define PARS_H
-
-#include <string>
+#include <set>
 #include <vector>
-#include <utility>
-#include <stdexcept>
-#include "../class/Matrix/matrix.h"  // Подключаем ваш класс Matrix
+#include <string>
+#include "matrix.h" // предполагая, что у вас есть класс Matrix
 
-// Структура для хранения загруженных данных
-template<typename T = double>
+template<typename T>
 struct Dataset {
-    Matrix<T> inputs;      // Входные данные (признаки)
-    Matrix<T> targets;     // Целевые значения (метки)
-    std::vector<std::string> headers;  // Заголовки колонок (опционально)
+    Matrix<T> inputs;    // признаки (x, y координаты)
+    Matrix<T> targets;   // метки классов (0, 1, 2, ...)
+    std::vector<std::string> headers;
 };
 
-// Класс для парсинга CSV файлов
 class CSVParser {
 private:
-    char delimiter_;       // Разделитель (по умолчанию ',')
-    bool has_header_;      // Есть ли заголовок в первой строке
-    void validateColumns(const Matrix<double>& matrix,
-                        const std::vector<int>& columns,
+    char delimiter_;
+    bool has_header_;
+    
+    // Вспомогательные методы
+    std::vector<std::string> splitLine(const std::string& line) const;
+    double parseDouble(const std::string& token, size_t row, size_t col) const;
+    void validateColumns(const Matrix<double>& matrix, 
+                        const std::vector<int>& columns, 
                         const std::string& context) const;
-    Matrix<double> extractColumns(const Matrix<double>& source,
+    Matrix<double> extractColumns(const Matrix<double>& source, 
                                   const std::vector<int>& columns) const;
 
-    // Вспомогательная функция для разбиения строки
-    std::vector<std::string> splitLine(const std::string& line) const;
-
-    // Преобразование строки в число с обработкой ошибок
-    double parseDouble(const std::string& token, size_t row, size_t col) const;
+    std::string cleanToken(const std::string& token) const;
 
 public:
     // Конструктор
-    explicit CSVParser(char delimiter = ',', bool has_header = true);
-
-    // Загрузка всего CSV файла в матрицу
+    CSVParser(char delimiter = ',', bool has_header = true);
+    
+    // Основные методы
     Matrix<double> loadToMatrix(const std::string& filename) const;
-
-    // Загрузка данных для обучения (с разделением на inputs и targets)
+    
+    // Специализированный метод для 2D классификации
+    Dataset<double> loadClassification2D(const std::string& filename) const;
+    
+    // Общие методы загрузки
     Dataset<double> loadTrainingData(
         const std::string& filename,
-        const std::vector<int>& input_columns,   // индексы колонок для входов
-        const std::vector<int>& target_columns   // индексы колонок для целей
+        const std::vector<int>& input_columns,
+        const std::vector<int>& target_columns
     ) const;
-
-    // Загрузка с автоматическим определением (последняя колонка - цель)
+    
     Dataset<double> loadTrainingDataAuto(const std::string& filename) const;
-
-    // Загрузка только входных данных (для предсказаний)
-    Matrix<double> loadInputsOnly(
-        const std::string& filename,
-        const std::vector<int>& input_columns
-    ) const;
-
-    // Получить заголовки колонок (если есть)
+    Matrix<double> loadInputsOnly(const std::string& filename,
+                                  const std::vector<int>& input_columns) const;
+    
+    // Метод для получения заголовков
     std::vector<std::string> getHeaders(const std::string& filename) const;
-
-    // Установка разделителя
-    void setDelimiter(char delimiter) { delimiter_ = delimiter; }
-
-    // Установка наличия заголовка
-    void setHasHeader(bool has_header) { has_header_ = has_header; }
+    
+    // Новый метод: разделение на train/test
+    struct TrainTestSplit {
+        Matrix<double> X_train, X_test, y_train, y_test;
+    };
+    
+    TrainTestSplit splitTrainTest(const Matrix<double>& X,
+                                  const Matrix<double>& y,
+                                  double test_ratio = 0.2,
+                                  bool shuffle = true) const;
 };
 
-#endif // CSV_PARSER_H
+#endif
