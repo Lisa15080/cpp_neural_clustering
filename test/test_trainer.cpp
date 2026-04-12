@@ -1,3 +1,4 @@
+
 #include <gtest/gtest.h>
 #include "../neuro_model/Trainer_class/trainer.h"
 #include "../class/Matrix/matrix.h"
@@ -110,3 +111,4 @@ TEST(TrainerTest, EvaluateReturnsPercentage) {
     EXPECT_LE(accuracy, 100.0);
     EXPECT_TRUE(std::isfinite(accuracy));
 }
+>>>>>>> 82fd8b2d5a716fb06c86ae545493271ea592bcb4
