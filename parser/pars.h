@@ -4,7 +4,7 @@
 #include <set>
 #include <vector>
 #include <string>
-#include "matrix.h" // предполагая, что у вас есть класс Matrix
+#include "../class/Matrix/matrix.h"
 
 template<typename T>
 struct Datasetpars {

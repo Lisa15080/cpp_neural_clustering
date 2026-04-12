@@ -13,15 +13,37 @@ CSVParser::CSVParser(char delimiter, bool has_header)
     : delimiter_(delimiter), has_header_(has_header) {}
 
 std::string CSVParser::cleanToken(const std::string& token) const {
+    if (token.empty()) return token;
+    
     std::string cleaned = token;
 
-    // Удаляем пробелы в начале и конце
-    cleaned.erase(0, cleaned.find_first_not_of(" \t\r\n"));
-    cleaned.erase(cleaned.find_last_not_of(" \t\r\n") + 1);
+    // 1. Удаляем пробелы, табы, переносы строк
+    size_t start = cleaned.find_first_not_of(" \t\r\n");
+    if (start == std::string::npos) return "";
+    size_t end = cleaned.find_last_not_of(" \t\r\n");
+    cleaned = cleaned.substr(start, end - start + 1);
+    
+    if (cleaned.empty()) return cleaned;
 
-    // Удаляем кавычки, если есть
-    if (cleaned.size() >= 2 && cleaned.front() == '"' && cleaned.back() == '"') {
-        cleaned = cleaned.substr(1, cleaned.size() - 2);
+    // 2. Удаляем кавычки с обоих концов (повторяем пока есть)
+    bool changed = true;
+    while (changed && cleaned.size() >= 1) {
+        changed = false;
+        if (cleaned.front() == '"' || cleaned.front() == '\'') {
+            cleaned.erase(0, 1);
+            changed = true;
+        }
+        if (!cleaned.empty() && (cleaned.back() == '"' || cleaned.back() == '\'')) {
+            cleaned.pop_back();
+            changed = true;
+        }
+    }
+
+    // 3. Финальная обрезка пробелов
+    start = cleaned.find_first_not_of(" \t\r\n");
+    if (start != std::string::npos) {
+        end = cleaned.find_last_not_of(" \t\r\n");
+        cleaned = cleaned.substr(start, end - start + 1);
     }
 
     return cleaned;
