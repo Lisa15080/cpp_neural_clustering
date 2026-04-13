@@ -78,12 +78,12 @@ public:
     static double linear(double x);
     static double linearDerivative(double x);
 
-private:
-    std::vector<Layer> layers;
-
     void applyActivation(Matrix<double>& mat, Activation act);
     void applyActivationDerivative(Matrix<double>& mat, Activation act);
     static void softmax(Matrix<double>& mat);
+
+private:
+    std::vector<Layer> layers;
 
     void log(const std::string& message, bool toConsole = true);
 

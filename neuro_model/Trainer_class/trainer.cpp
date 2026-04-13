@@ -7,6 +7,7 @@
 #include <random>
 #include <numbers>
 #include <functional>
+#include <algorithm>
 
 using namespace std;
 
@@ -21,15 +22,6 @@ namespace {
         return result;
     }
 
-    // Применение функции к каждому элементу столбца
-    Matrix<double> apply_function(const Matrix<double>& m, const std::function<double(double)>& func) {
-        Matrix<double> result(m.rows(), 1);
-        for (size_t j = 0; j < m.rows(); ++j) {
-            result(j, 0) = func(m(j, 0));
-        }
-        return result;
-    }
-
     // MSE ошибка для одного вектора
     double compute_mse(const Matrix<double>& output, const Matrix<double>& target) {
         double error = 0.0;
@@ -40,9 +32,35 @@ namespace {
         return error;
     }
 
-    // Пороговая классификация
+    // Cross-Entropy ошибка (для softmax)
+    double compute_cross_entropy(const Matrix<double>& output, const Matrix<double>& target) {
+        double loss = 0.0;
+        const double eps = 1e-15;
+        for (size_t j = 0; j < output.rows(); ++j) {
+            double out_val = max(min(output(j, 0), 1.0 - eps), eps);
+            if (target(j, 0) > 0.5) {
+                loss -= log(out_val);
+            }
+        }
+        return loss;
+    }
+
+    // Пороговая классификация (только для бинарного случая)
     int threshold(double value) {
         return (value > 0.5) ? 1 : 0;
+    }
+
+    // Argmax для мультиклассовой классификации
+    int argmax(const Matrix<double>& vec) {
+        int max_idx = 0;
+        double max_val = vec(0, 0);
+        for (size_t i = 1; i < vec.rows(); ++i) {
+            if (vec(i, 0) > max_val) {
+                max_val = vec(i, 0);
+                max_idx = static_cast<int>(i);
+            }
+        }
+        return max_idx;
     }
 }
 
@@ -73,13 +91,13 @@ vector<Matrix<double>> Trainer::forward_pass(const Matrix<double>& input) const 
         for (size_t j = 0; j < z.rows(); ++j) {
             z(j, 0) += layers[l].biases(j, 0);
         }
+        layers[l].z = z;
 
-        // Применяем функцию активации (сигмоиду)
-        Matrix<double> activated = apply_function(
-            z,
-            [this](double x) { return network.sigmoid(x); }
-        );
+        //  Применяем активацию, указанную в слое 
+        Matrix<double> activated = z;
+        network.applyActivation(activated, layers[l].activation);
 
+        layers[l].a = activated;
         layer_outputs.push_back(activated);
         current = activated;
     }
@@ -110,28 +128,71 @@ void Trainer::backward_pass(
         );
     }
 
+    // Градиент для выходного слоя
+    const auto& last_layer = layers[num_layers - 1];
     Matrix<double> output_delta(output.rows(), 1);
 
-    for (size_t j = 0; j < output.rows(); ++j) {
-        double out_val = output(j, 0);
-        double t = target(j, 0);
-        output_delta(j, 0) = (out_val - t) * network.sigmoidDerivative(out_val);
+    if (last_layer.activation == Activation::SOFTMAX) {
+        // Softmax + CrossEntropy
+        for (size_t j = 0; j < output.rows(); ++j) {
+            output_delta(j, 0) = output(j, 0) - target(j, 0);
+        }
     }
-    deltas[num_layers - 1] = output_delta;
+    else if (last_layer.activation == Activation::SIGMOID) {
+        // Sigmoid + MSE (нужно учитывать производную)
+        for (size_t j = 0; j < output.rows(); ++j) {
+            double out_val = output(j, 0);
+            double t = target(j, 0);
 
+            double z = last_layer.z(j, 0);
+            double deriv = network.sigmoidDerivative(z);
+
+            output_delta(j, 0) = (out_val - t) * deriv;
+        }
+    }
+    else {
+        // Для остальных активаций
+        for (size_t j = 0; j < output.rows(); ++j) {
+            double out_val = output(j, 0);
+            double t = target(j, 0);
+            double deriv = 0.0;
+
+            switch (last_layer.activation) {
+                case Activation::RELU:
+                    deriv = network.reluDerivative(last_layer.z(j, 0));
+                    break;
+                case Activation::LINEAR:
+                    deriv = 1.0;
+                    break;
+                default:
+                    deriv = 1.0;
+            }
+
+            output_delta(j, 0) = (out_val - t) * deriv;
+        }
+    }
+
+    deltas[num_layers - 1] = output_delta;
+    // Обратный проход по скрытым слоям
     for (int l = static_cast<int>(num_layers) - 2; l >= 0; --l) {
         const Matrix<double>& current_output = layer_outputs[l + 1];
         Matrix<double> delta(current_output.rows(), 1);
 
         for (size_t j = 0; j < delta.rows(); ++j) {
             double error_sum = 0.0;
-
             for (size_t k = 0; k < deltas[l + 1].rows(); ++k) {
                 error_sum += layers[l + 1].weights(k, j) * deltas[l + 1](k, 0);
             }
+            delta(j, 0) = error_sum;
+        }
 
-            double a = current_output(j, 0);
-            delta(j, 0) = error_sum * network.sigmoidDerivative(a);
+        // 👇 Применяем производную активации предыдущего слоя
+        const auto& prevLayer = layers[l];
+        Matrix<double> deriv = prevLayer.z;  // z с прямого прохода
+        network.applyActivationDerivative(deriv, prevLayer.activation);
+        
+        for (size_t i = 0; i < delta.rows(); ++i) {
+            delta(i, 0) *= deriv(i, 0);
         }
         deltas[l] = delta;
     }
@@ -183,7 +244,15 @@ double Trainer::train_on_sample(const Matrix<double>& input, const Matrix<double
     vector<Matrix<double>> layer_outputs = forward_pass(input);
 
     const Matrix<double>& output = layer_outputs.back();
-    double error = compute_mse(output, target);
+    
+    // Выбираем функцию потерь в зависимости от активации выхода
+    double error = 0.0;
+    const auto& last_layer = network.getLayers().back();
+    if (last_layer.activation == Activation::SOFTMAX) {
+        error = compute_cross_entropy(output, target);
+    } else {
+        error = compute_mse(output, target);
+    }
 
     vector<Matrix<double>> deltas(network.getLayers().size());
     backward_pass(layer_outputs, target, deltas);
@@ -243,7 +312,6 @@ void Trainer::train(
         throw invalid_argument("train: inputs or targets is empty");
     }
     
-    // Конвертируем векторы в матрицы
     Matrix<double> inputs_mat(inputs.size(), inputs[0].size());
     for (size_t i = 0; i < inputs.size(); ++i) {
         for (size_t j = 0; j < inputs[i].size(); ++j) {
@@ -282,9 +350,11 @@ double Trainer::evaluate(const Matrix<double>& inputs, const Matrix<double>& tar
 
         vector<Matrix<double>> layer_outputs = forward_pass(input);
         const Matrix<double>& output = layer_outputs.back();
+        const Matrix<double> target = extract_column(targets, i);
 
-        int predicted = threshold(output(0, 0));
-        int actual = static_cast<int>(targets(i, 0) + 0.5); // Округляем для безопасности
+        // Argmax для мультиклассовой классификации
+        int predicted = argmax(output);
+        int actual = argmax(target);  // one-hot вектор → индекс класса
 
         if (predicted == actual) {
             correct++;
@@ -308,7 +378,6 @@ double Trainer::evaluate(
         return 0.0;
     }
     
-    // Конвертируем векторы в матрицы
     Matrix<double> inputs_mat(inputs.size(), inputs[0].size());
     for (size_t i = 0; i < inputs.size(); ++i) {
         for (size_t j = 0; j < inputs[i].size(); ++j) {
@@ -334,7 +403,7 @@ Matrix<double> Trainer::predict(const Matrix<double>& input) const {
     return activations.back();
 }
 
-// Предсказание для одного примера (возвращает std::vector)
+// Предсказание для одного примера (возвращает вектор вероятностей)
 std::vector<double> Trainer::predict(const std::vector<double>& input) const {
     Matrix<double> input_mat(input.size(), 1);
     for (size_t i = 0; i < input.size(); ++i) {
@@ -350,6 +419,20 @@ std::vector<double> Trainer::predict(const std::vector<double>& input) const {
     return result;
 }
 
+// Предсказание класса для одного примера (возвращает индекс класса)
+int Trainer::predict_class(const std::vector<double>& input) const {
+    auto probs = predict(input);
+    int max_idx = 0;
+    double max_prob = probs[0];
+    for (size_t i = 1; i < probs.size(); ++i) {
+        if (probs[i] > max_prob) {
+            max_prob = probs[i];
+            max_idx = static_cast<int>(i);
+        }
+    }
+    return max_idx;
+}
+
 // ===== ПРЕДСКАЗАНИЕ ДЛЯ НЕСКОЛЬКИХ ПРИМЕРОВ =====
 Matrix<double> Trainer::predict_batch(const Matrix<double>& inputs) const {
     Matrix<double> results(inputs.rows(), 1);
@@ -357,7 +440,7 @@ Matrix<double> Trainer::predict_batch(const Matrix<double>& inputs) const {
     for (size_t i = 0; i < inputs.rows(); ++i) {
         Matrix<double> input = extract_column(inputs, i);
         Matrix<double> output = predict(input);
-        results(i, 0) = output(0, 0);
+        results(i, 0) = output(0, 0);  // для бинарного случая
     }
     
     return results;
@@ -370,6 +453,8 @@ double Trainer::compute_loss(const Matrix<double>& inputs, const Matrix<double>&
     }
     
     double total_loss = 0.0;
+    const auto& last_layer = network.getLayers().back();
+    
     for (size_t i = 0; i < inputs.rows(); ++i) {
         Matrix<double> input = extract_column(inputs, i);
         Matrix<double> target = extract_column(targets, i);
@@ -377,7 +462,11 @@ double Trainer::compute_loss(const Matrix<double>& inputs, const Matrix<double>&
         vector<Matrix<double>> layer_outputs = forward_pass(input);
         const Matrix<double>& output = layer_outputs.back();
         
-        total_loss += compute_mse(output, target);
+        if (last_layer.activation == Activation::SOFTMAX) {
+            total_loss += compute_cross_entropy(output, target);
+        } else {
+            total_loss += compute_mse(output, target);
+        }
     }
     
     return total_loss / inputs.rows();

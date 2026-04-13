@@ -76,11 +76,14 @@ public:
 
     // ========== МЕТОДЫ ПРЕДСКАЗАНИЯ ==========
 
-    // Предсказание для одного примера (возвращает вектор)
+    // Предсказание для одного примера (возвращает вектор вероятностей)
     std::vector<double> predict(const std::vector<double>& input) const;
 
     // Предсказание для одного примера (возвращает матрицу-столбец)
     Matrix<double> predict(const Matrix<double>& input) const;
+
+    // 👇 Предсказание класса для одного примера (возвращает индекс класса)
+    int predict_class(const std::vector<double>& input) const;
 
     // Предсказание для нескольких примеров (матрица входов -> матрица выходов)
     Matrix<double> predict_batch(const Matrix<double>& inputs) const;

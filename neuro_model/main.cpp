@@ -1,7 +1,8 @@
 #include "Neural_Net/neural_net.h"
-#include "../Trainer_class/trainer.h"
+#include "Trainer_class/trainer.h"
 #include "../class/Matrix/matrix.h"
 #include "../parser/pars.h"
+#include "visualize.h"
 
 #include <iostream>
 #include <iomanip>
@@ -10,14 +11,17 @@
 #include <numeric>
 #include <algorithm>
 #include <fstream>
-#include <sstream>
-#include <set>
+#include <string>
 
 #ifdef _WIN32
     #include <direct.h>
+#else
+    #include <unistd.h>
 #endif
 
 using namespace std;
+
+// Вспомогательные функции
 
 // Получить текущую рабочую директорию
 string getCurrentPath() {
@@ -39,31 +43,6 @@ vector<vector<double>> matrixToVector(const Matrix<double>& mat) {
     return vec;
 }
 
-// Преобразовать vector<vector<double>> в Matrix<double>
-Matrix<double> vectorToMatrix(const vector<vector<double>>& vec) {
-    if (vec.empty()) return Matrix<double>();
-    size_t rows = vec.size();
-    size_t cols = vec[0].size();
-    Matrix<double> mat(rows, cols);
-    for (size_t i = 0; i < rows; ++i)
-        for (size_t j = 0; j < cols; ++j)
-            mat(i, j) = vec[i][j];
-    return mat;
-}
-
-// Функция для очистки строки от кавычек и пробелов
-string cleanString(const string& str) {
-    string result = str;
-    // Удаляем пробелы в начале и конце
-    result.erase(0, result.find_first_not_of(" \t\r\n"));
-    result.erase(result.find_last_not_of(" \t\r\n") + 1);
-    // Удаляем кавычки в начале и конце если они есть
-    if (result.size() >= 2 && result.front() == '"' && result.back() == '"') {
-        result = result.substr(1, result.size() - 2);
-    }
-    return result;
-}
-
 // Структура для хранения разбиения на train/test
 struct DataSplit {
     Matrix<double> X_train, X_test;
@@ -72,15 +51,15 @@ struct DataSplit {
 
 // Функция разбиения матриц на обучающую и тестовую выборки
 DataSplit trainTestSplit(const Matrix<double>& X, const Matrix<double>& y,
-                         double test_ratio, bool do_shuffle) {
+                         double test_ratio = 0.2, bool do_shuffle = true) {
     size_t n = X.rows();
     vector<size_t> indices(n);
-    iota(indices.begin(), indices.end(), 0);
+    iota(indices.begin(), indices.end(), 0);   // 0, 1, 2, ..., n-1
 
     if (do_shuffle) {
         random_device rd;
         mt19937 g(rd());
-        shuffle(indices.begin(), indices.end(), g);
+        std::shuffle(indices.begin(), indices.end(), g);
     }
 
     size_t test_size = static_cast<size_t>(n * test_ratio);
@@ -104,142 +83,29 @@ DataSplit trainTestSplit(const Matrix<double>& X, const Matrix<double>& y,
     return {X_train, X_test, y_train, y_test};
 }
 
-// Загрузка CSV с автоматической очисткой кавычек
-struct CleanDataset {
-    Matrix<double> inputs;
-    Matrix<double> targets;
-};
-
-CleanDataset loadCSVWithCleaning(const string& filename, char delimiter = ',') {
-    ifstream file(filename);
-    if (!file.is_open()) {
-        throw runtime_error("Не удалось открыть файл: " + filename);
-    }
-
-    vector<vector<double>> data_rows;
-    vector<string> lines;
-    string line;
-
-    // Пропускаем заголовок
-    getline(file, line);
-
-    // Читаем все строки
-    while (getline(file, line)) {
-        if (line.empty()) continue;
-        lines.push_back(line);
-    }
-    file.close();
-
-    if (lines.empty()) {
-        throw runtime_error("Файл пуст или содержит только заголовок: " + filename);
-    }
-
-    // Определяем количество столбцов по первой строке
-    stringstream ss(lines[0]);
-    string token;
-    size_t cols = 0;
-    while (getline(ss, token, delimiter)) cols++;
-
-    // Парсим данные
-    for (const auto& l : lines) {
-        stringstream ss_line(l);
-        vector<double> row;
-        size_t col_idx = 0;
-
-        while (getline(ss_line, token, delimiter)) {
-            string cleaned = cleanString(token);
-            if (cleaned.empty()) {
-                row.push_back(0.0);
-            } else {
-                try {
-                    row.push_back(stod(cleaned));
-                } catch (...) {
-                    row.push_back(0.0);
-                }
-            }
-            col_idx++;
-        }
-
-        if (!row.empty()) {
-            data_rows.push_back(row);
-        }
-    }
-
-    if (data_rows.empty()) {
-        throw runtime_error("Не удалось распарсить данные из файла: " + filename);
-    }
-
-    size_t rows = data_rows.size();
-    size_t input_cols = cols - 1; // последний столбец - метка класса
-
-    CleanDataset result;
-    result.inputs = Matrix<double>(rows, input_cols);
-    result.targets = Matrix<double>(rows, 1);
-
-    for (size_t i = 0; i < rows; ++i) {
-        for (size_t j = 0; j < input_cols; ++j) {
-            result.inputs(i, j) = data_rows[i][j];
-        }
-        result.targets(i, 0) = data_rows[i][input_cols];
-    }
-
-    return result;
-}
+void save_clusters_json(const string& filename,
+                        const vector<double>& X,
+                        const vector<double>& Y,
+                        const vector<int>& labels);
 
 // Главная программа
 int main() {
-#ifdef _WIN32
-    system("chcp 65001 > nul");
-#endif
-
-    cout << "=== Нейронная сеть + Trainer (бинарная классификация) ===\n";
+    cout << "=== Нейронная сеть + Trainer ===\n";
     cout << "Текущая папка: " << getCurrentPath() << "\n\n";
 
     // Загрузка данных из CSV
     cout << "[1] Загрузка данных из CSV...\n";
-    string filename = "../Kegal_detaset/circles_detaset.csv";
+    CSVParser parser(',', true);
+    string filename = "../kaggle_dataset/circles_dataset.csv";
 
     try {
-        // Загружаем данные с автоматической очисткой от кавычек
-        CleanDataset clean_data = loadCSVWithCleaning(filename, ',');
+        // Загружаем данные для 2D классификации (формат: x, y, class)
+        Datasetpars<double> csv_dataset = parser.loadClassification2D(filename);
+        cout << "Загружено примеров: " << csv_dataset.inputs.rows()
+             << ", признаков: " << csv_dataset.inputs.cols() << "\n";
 
-        cout << "Загружено примеров: " << clean_data.inputs.rows()
-             << ", признаков: " << clean_data.inputs.cols() << "\n";
-
-        // Определяем уникальные классы в датасете
-        set<int> unique_classes;
-        for (size_t i = 0; i < clean_data.targets.rows(); ++i) {
-            unique_classes.insert(static_cast<int>(clean_data.targets(i, 0) + 0.5));
-        }
-        cout << "Найдено классов: " << unique_classes.size() << " (";
-        for (auto it = unique_classes.begin(); it != unique_classes.end(); ++it) {
-            if (it != unique_classes.begin()) cout << ", ";
-            cout << *it;
-        }
-        cout << ")\n";
-
-        // Если классов больше двух, преобразуем в бинарные
-        // Берём первый класс как 0, остальные как 1
-        Matrix<double> binary_targets(clean_data.targets.rows(), 1);
-        int class0 = *unique_classes.begin();
-        int count0 = 0, count1 = 0;
-
-        for (size_t i = 0; i < clean_data.targets.rows(); ++i) {
-            int label = static_cast<int>(clean_data.targets(i, 0) + 0.5);
-            if (label == class0) {
-                binary_targets(i, 0) = 0.0;
-                count0++;
-            } else {
-                binary_targets(i, 0) = 1.0;
-                count1++;
-            }
-        }
-
-        cout << "Преобразовано в бинарные метки: класс 0 = " << count0
-             << ", класс 1 = " << count1 << "\n";
-
-        // Разделяем на обучающую и тестовую выборки
-        DataSplit split = trainTestSplit(clean_data.inputs, binary_targets, 0.2, true);
+        // Разделяем на обучающую и тестовую выборки (80% / 20%)
+        DataSplit split = trainTestSplit(csv_dataset.inputs, csv_dataset.targets, 0.2, true);
         cout << "Обучающих примеров: " << split.X_train.rows()
              << ", тестовых: " << split.X_test.rows() << "\n";
 
@@ -249,16 +115,17 @@ int main() {
         vector<vector<double>> test_inputs   = matrixToVector(split.X_test);
         vector<vector<double>> test_targets  = matrixToVector(split.y_test);
 
-        // Создание сети для бинарной классификации
+        // Создание сети
         cout << "\n[2] Создание сети (архитектура: 2 -> 16 -> 8 -> 1)\n";
+        // Скрытые слои используют ReLU, выходной слой – сигмоида
         NeuralNetwork net({2, 16, 8, 1}, Activation::RELU, true, "log.txt");
 
-        // Обучение через Trainer
+        // 3. Обучение через Trainer 
         cout << "\n[3] Обучение...\n";
         TrainingConfig cfg;
-        cfg.epochs = 300;
-        cfg.learning_rate = 0.05;
-        cfg.verbose = true;
+        cfg.epochs = 500;           // количество эпох
+        cfg.learning_rate = 0.05;   // скорость обучения
+        cfg.verbose = true;         // печатать прогресс
 
         Trainer trainer(net, cfg);
         trainer.train(train_inputs, train_targets);
@@ -269,38 +136,39 @@ int main() {
              << accuracy << "%\n";
 
         // Демонстрация предсказаний
-        cout << "\n[5] Примеры предсказаний:\n";
-
-        // Находим границы данных для красивого вывода
-        double min_x = clean_data.inputs(0, 0), max_x = clean_data.inputs(0, 0);
-        double min_y = clean_data.inputs(0, 1), max_y = clean_data.inputs(0, 1);
-        for (size_t i = 0; i < clean_data.inputs.rows(); ++i) {
-            min_x = min(min_x, clean_data.inputs(i, 0));
-            max_x = max(max_x, clean_data.inputs(i, 0));
-            min_y = min(min_y, clean_data.inputs(i, 1));
-            max_y = max(max_y, clean_data.inputs(i, 1));
-        }
-
+        cout << "\n[5] Примеры предсказаний для нескольких точек:\n";
         vector<vector<double>> samples = {
-            {min_x, min_y},
-            {(min_x + max_x) / 2, (min_y + max_y) / 2},
-            {max_x, max_y},
-            {min_x, max_y},
-            {max_x, min_y}
+            {0.0, 0.0},
+            {0.5, 0.5},
+            {-0.5, -0.5},
+            {0.8, -0.2}
         };
 
         for (const auto& pt : samples) {
             vector<double> out = trainer.predict(pt);
             int pred = (out[0] > 0.5) ? 1 : 0;
-            cout << "  Точка (" << setw(8) << fixed << setprecision(2) << pt[0]
-                 << ", " << setw(8) << pt[1]
-                 << ") -> P(1) = " << setprecision(4) << out[0]
-                 << ", класс: " << pred << "\n";
+            cout << "  Точка (" << setw(5) << pt[0] << ", " << setw(5) << pt[1]
+                 << ") -> вероятность класса 1: " << fixed << setprecision(4) << out[0]
+                 << ", предсказанный класс: " << pred << "\n";
         }
+
+        save_true_clusters_json("true_clusters.json", csv_dataset.inputs, csv_dataset.targets);
+        save_predictions_json("predictions.json", csv_dataset.inputs, trainer);
+        cout << "[+] Визуализация: true_clusters.json, predictions.json → python3 plot.py\n";
 
         // Сохраняем обученную модель
         net.saveModel("trained_model.txt");
         cout << "\nМодель сохранена в файл: trained_model.txt\n";
+
+        vector<double> X, Y;
+        vector<int> L;
+        for(size_t i=0; i<csv_dataset.inputs.rows(); ++i) {
+            X.push_back(csv_dataset.inputs(i, 0));
+            Y.push_back(csv_dataset.inputs(i, 1));
+            L.push_back(static_cast<int>(csv_dataset.targets(i, 0)));
+        }
+        save_clusters_json("clusters.json", X, Y, L);
+        cout << "\n[+] Данные сохранены. Запусти: python3 plot.py\n";
 
     } catch (const exception& e) {
         cerr << "Ошибка при работе с CSV: " << e.what() << "\n";
@@ -308,9 +176,10 @@ int main() {
         cerr << "Продолжаем с тестом XOR...\n";
     }
 
-    // Тест XOR для проверки работоспособности
+    // 6. Тест XOR (для проверки работоспособности)
     cout << "\n[6] Тест XOR (проверка базовой работы сети)\n";
 
+    // Данные XOR
     Matrix<double> xor_inputs = {
         {0, 0},
         {0, 1},
@@ -324,15 +193,18 @@ int main() {
         {0}
     };
 
+    // Преобразуем в векторы
     vector<vector<double>> xor_in_vec = matrixToVector(xor_inputs);
     vector<vector<double>> xor_tar_vec = matrixToVector(xor_targets);
 
+    // Создаём небольшую сеть (скрытые слои – сигмоида)
     NeuralNetwork xor_net({2, 4, 1}, Activation::SIGMOID, false);
 
+    // Настройки обучения для XOR
     TrainingConfig xor_cfg;
     xor_cfg.epochs = 2000;
     xor_cfg.learning_rate = 0.5;
-    xor_cfg.verbose = false;  // меньше вывода для XOR
+    xor_cfg.verbose = true;
 
     Trainer xor_trainer(xor_net, xor_cfg);
     xor_trainer.train(xor_in_vec, xor_tar_vec);
@@ -348,5 +220,20 @@ int main() {
     }
 
     cout << "\n=== Программа завершена ===\n";
+
     return 0;
+}
+
+void save_clusters_json(const string& filename,
+                        const vector<double>& X,
+                        const vector<double>& Y,
+                        const vector<int>& labels) {
+    ofstream f(filename);
+    f << "{\"x\": [";
+    for(size_t i=0; i<X.size(); ++i) f << (i?",":"") << X[i];
+    f << "], \"y\": [";
+    for(size_t i=0; i<Y.size(); ++i) f << (i?",":"") << Y[i];
+    f << "], \"labels\": [";
+    for(size_t i=0; i<labels.size(); ++i) f << (i?",":"") << labels[i];
+    f << "]}";
 }

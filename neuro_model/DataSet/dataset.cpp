@@ -1,4 +1,4 @@
-#include "neuro_model/DataSet/dataset.h"
+#include "../DataSet/dataset.h"
 #include <cmath>
 #include <cstdlib>
 #include <ctime>
