@@ -347,17 +347,29 @@ double Trainer::evaluate(const Matrix<double>& inputs, const Matrix<double>& tar
 
     for (size_t i = 0; i < inputs.rows(); ++i) {
         Matrix<double> input = extract_column(inputs, i);
-
         vector<Matrix<double>> layer_outputs = forward_pass(input);
         const Matrix<double>& output = layer_outputs.back();
-        const Matrix<double> target = extract_column(targets, i);
 
-        // Argmax для мультиклассовой классификации
-        int predicted = argmax(output);
-        int actual = argmax(target);  // one-hot вектор → индекс класса
+        // Для бинарной классификации (один выходной нейрон)
+        if (output.cols() == 1 && output.rows() == 1) {
+            double pred_value = output(0, 0);
+            double target_value = targets(i, 0);
 
-        if (predicted == actual) {
-            correct++;
+            // Бинарная классификация: порог 0.5
+            int predicted = (pred_value > 0.5) ? 1 : 0;
+            int actual = static_cast<int>(target_value + 0.5);  // округление
+
+            if (predicted == actual) {
+                correct++;
+            }
+        }
+        // Для мультиклассовой классификации (one-hot)
+        else {
+            int predicted = argmax(output);
+            int actual = argmax(extract_column(targets, i));
+            if (predicted == actual) {
+                correct++;
+            }
         }
     }
 
