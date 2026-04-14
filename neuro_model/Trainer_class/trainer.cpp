@@ -320,7 +320,7 @@ double Trainer::evaluate(const Matrix<double>& inputs, const Matrix<double>& tar
 
             // Бинарная классификация: порог 0.5
             int predicted = (pred_value > 0.5) ? 1 : 0;
-            int actual = static_cast<int>(target_value + 0.5);  // округление
+            int actual = static_cast<int>(target_value + 0.5);
 
             if (predicted == actual) {
                 correct++;

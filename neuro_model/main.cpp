@@ -1,5 +1,5 @@
 #include "Neural_Net/neural_net.h"
-#include "../Trainer_class/trainer.h"
+#include "Trainer_class/trainer.h"
 #include "../class/Matrix/matrix.h"
 #include "../parser/pars.h"
 
@@ -12,9 +12,14 @@
 #include <cmath>
 #include <map>
 #include <string>
+#include <sstream>
+#include <cstdlib> 
 
 #ifdef _WIN32
     #include <direct.h>
+    #define getcwd _getcwd
+#else
+    #include <unistd.h>
 #endif
 
 using namespace std;
