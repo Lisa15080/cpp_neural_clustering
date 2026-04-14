@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <fstream>
 #include <cmath>
+#include "libs/json.hpp"
 
 #ifdef _WIN32
     #include <direct.h>
@@ -102,6 +103,27 @@ void trainValidationSplit(const vector<vector<double>>& features,
     val_targets.assign(targets.begin() + train_size, targets.end());
 }
 
+void saveToJSON(const vector<vector<double>>& inputs,
+                const vector<vector<double>>& targets,
+                const string& filename) {
+    nlohmann::json data;
+    vector<double> x, y, labels;
+
+    for (size_t i = 0; i < inputs.size(); ++i) {
+        x.push_back(inputs[i][0]);
+        y.push_back(inputs[i][1]);
+        labels.push_back(targets[i][0]);
+    }
+
+    data["x"] = x;
+    data["y"] = y;
+    data["labels"] = labels;
+
+    ofstream file(filename);
+    file << data.dump(4);
+    file.close();
+}
+
 // Главная программа
 int main() {
 #ifdef _WIN32
@@ -110,6 +132,12 @@ int main() {
 
     cout << "=== Нейронная сеть - бинарная классификация (Синтетические данные) ===\n";
     cout << "Текущая папка: " << getCurrentPath() << "\n\n";
+
+    // Объявляем переменные ДО try, чтобы они были доступны после
+    Dataset synthetic_data;
+    Trainer* trainer_ptr = nullptr;
+    NeuralNetwork* net_ptr = nullptr;
+    TrainingConfig cfg;
 
     try {
         cout << "[1] Генерация синтетического датасета...\n";
@@ -121,7 +149,7 @@ int main() {
 
         // Генерируем данные с помощью DatasetGenerator
         DatasetGenerator generator;
-        Dataset synthetic_data = generator.generate_gaussian(n_samples, cluster_std, separation);
+        synthetic_data = generator.generate_gaussian(n_samples, cluster_std, separation);
 
         cout << "  - Сгенерировано примеров: " << synthetic_data.inputs.size() << "\n";
         cout << "  - Признаков: " << synthetic_data.inputs[0].size() << " (x, y)\n";
@@ -159,15 +187,16 @@ int main() {
         size_t n_features = train_features[0].size();
         cout << "\n[4] Создание сети (архитектура: " << n_features << " -> 32 -> 16 -> 1)\n";
         NeuralNetwork net({(int)n_features, 32, 16, 1}, Activation::RELU, true, "log.txt");
+        net_ptr = &net;
 
         // Обучение
         cout << "\n[5] Обучение...\n";
-        TrainingConfig cfg;
         cfg.epochs = 300;
         cfg.learning_rate = 0.01;
         cfg.verbose = true;
 
         Trainer trainer(net, cfg);
+        trainer_ptr = &trainer;
         trainer.train(train_features, train_targets);
 
         // Оценка на валидационных данных
@@ -208,7 +237,7 @@ int main() {
         net.saveModel("synthetic_model.txt");
         cout << "\n[8] Модель сохранена в synthetic_model.txt\n";
 
-        // Сохранение данных в CSV для визуализации (опционально)
+        // Сохранение данных в CSV для визуализации
         ofstream data_file("synthetic_data.csv");
         data_file << "x,y,class\n";
         for (size_t i = 0; i < synthetic_data.inputs.size(); ++i) {
@@ -219,13 +248,39 @@ int main() {
         data_file.close();
         cout << "  - Данные сохранены в synthetic_data.csv (для визуализации)\n";
 
+        // Сохранение JSON для Python визуализации
+        cout << "\n[9] Сохранение данных для визуализации...\n";
+        saveToJSON(synthetic_data.inputs, synthetic_data.targets, "true_clusters.json");
+
+        // Для предсказаний
+        vector<vector<double>> predictions;
+        for (size_t i = 0; i < synthetic_data.inputs.size(); ++i) {
+            vector<double> out = trainer.predict(synthetic_data.inputs[i]);
+            predictions.push_back({(out[0] > 0.5) ? 1.0 : 0.0});
+        }
+        saveToJSON(synthetic_data.inputs, predictions, "predictions.json");
+
         // Итоговая статистика
         cout << "\n=== Итоговая статистика ===\n";
         cout << "  - Архитектура сети: " << n_features << " → 32 → 16 → 1\n";
         cout << "  - Эпохи: " << cfg.epochs << "\n";
         cout << "  - Learning rate: " << cfg.learning_rate << "\n";
         cout << "  - Точность на валидации: " << val_accuracy << "%\n";
-        cout << "  - Файлы созданы: synthetic_model.txt, log.txt, synthetic_data.csv\n";
+        cout << "  - Файлы созданы: synthetic_model.txt, log.txt, synthetic_data.csv, true_clusters.json, predictions.json\n";
+
+        // Запуск Python скрипта
+        string copy_cmd1 = "copy true_clusters.json ..\\neuro_model\\";
+        string copy_cmd2 = "copy predictions.json ..\\neuro_model\\";
+
+        int copy1 = system(copy_cmd1.c_str());
+        int copy2 = system(copy_cmd2.c_str());
+        cout << "\n[10] Запуск Python скрипта для визуализации...\n";
+        int result = system("py ../neuro_model/plot.py");
+        if (result == 0) {
+            cout << "  ✅ Визуализация завершена. Результат: result.png\n";
+        } else {
+            cout << "  ⚠️ Не удалось запустить Python. Убедитесь, что Python установлен.\n";
+        }
 
     } catch (const exception& e) {
         cerr << "\n❌ Ошибка: " << e.what() << "\n";
