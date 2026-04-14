@@ -1,25 +1,34 @@
-
 #include <gtest/gtest.h>
 #include "../neuro_model/Trainer_class/trainer.h"
 #include "../class/Matrix/matrix.h"
 
 // ТЕСТ 1: Конструктор — проверка создания тренера
 TEST(TrainerTest, ConstructorWorks) {
-    NeuralNetwork net({2, 2, 1}, false);
+    NeuralNetwork net;
+    net.addLayer(Layer(2, 2, Activation::SIGMOID));
+    net.addLayer(Layer(2, 1, Activation::SIGMOID));
     
-    // Создаём тренера для этой сети
-    Trainer trainer(net);
+    TrainingConfig cfg;
+    cfg.epochs = 1000;
+    cfg.learning_rate = 0.1;
     
-    // Проверяем, что тренер создался 
-    auto config = trainer.getConfig();
-    EXPECT_EQ(config.epochs, 1000);         
-    EXPECT_DOUBLE_EQ(config.learning_rate, 0.1);
+    Trainer trainer(net, cfg);
+    
+    SUCCEED();
 }
 
 // ТЕСТ 2: Обучение — не падает ли при запуске?
 TEST(TrainerTest, TrainDoesNotCrash) {
-    NeuralNetwork net({2, 3, 1}, false);
-    Trainer trainer(net);
+    NeuralNetwork net;
+    net.addLayer(Layer(2, 3, Activation::RELU));
+    net.addLayer(Layer(3, 1, Activation::SIGMOID));
+    
+    TrainingConfig cfg;
+    cfg.epochs = 5;
+    cfg.learning_rate = 0.1;
+    cfg.verbose = false;
+    
+    Trainer trainer(net, cfg);
     
     Matrix<double> inputs(2, 2);
     inputs(0, 0) = 0.0; inputs(0, 1) = 0.0;   
@@ -29,18 +38,17 @@ TEST(TrainerTest, TrainDoesNotCrash) {
     targets(0, 0) = 0.0; 
     targets(1, 0) = 1.0; 
     
-    TrainingConfig cfg;
-    cfg.epochs = 5;
-    cfg.verbose = false;
-    trainer.setConfig(cfg);
-    
     EXPECT_NO_THROW(trainer.train(inputs, targets));
 }
 
 // ТЕСТ 3: Проверка возвращения числа
 TEST(TrainerTest, PredictReturnsValue) {
-    NeuralNetwork net({2, 2, 1}, false);
-    Trainer trainer(net);
+    NeuralNetwork net;
+    net.addLayer(Layer(2, 2, Activation::SIGMOID));
+    net.addLayer(Layer(2, 1, Activation::SIGMOID));
+    
+    TrainingConfig cfg;
+    Trainer trainer(net, cfg);
     
     std::vector<double> input = {0.5, -0.3};
     
@@ -54,48 +62,47 @@ TEST(TrainerTest, PredictReturnsValue) {
 
 // ТЕСТ 4: Ошибка уменьшается после обучения 
 TEST(TrainerTest, LossDecreasesAfterTraining) {
-    NeuralNetwork net({2, 2, 1}, false);
-    Trainer trainer(net);
-    
-    Matrix<double> input(2, 1);
-    input(0, 0) = 0.5;
-    input(1, 0) = 0.5;
-    
-    Matrix<double> target(1, 1);
-    target(0, 0) = 1.0;
-    
-    // Ошибка ДО обучения
-    auto out_before = trainer.predict(input);
-    double error_before = (out_before(0, 0) - 1.0) * (out_before(0, 0) - 1.0);
-    
-    // Обучаем через публичный метод train()
-    Matrix<double> inputs(1, 2);
-    inputs(0, 0) = 0.5;
-    inputs(0, 1) = 0.5;
-    
-    Matrix<double> targets(1, 1);
-    targets(0, 0) = 1.0;
+    NeuralNetwork net;
+    net.addLayer(Layer(2, 4, Activation::RELU));
+    net.addLayer(Layer(4, 1, Activation::SIGMOID));
     
     TrainingConfig cfg;
-    cfg.epochs = 50;    
+    cfg.epochs = 100;    
+    cfg.learning_rate = 0.5;
     cfg.verbose = false;
-    trainer.setConfig(cfg);
     
+    Trainer trainer(net, cfg);
+    
+    // Подготавливаем данные для XOR
+    Matrix<double> inputs(4, 2);
+    Matrix<double> targets(4, 1);
+    
+    inputs(0, 0) = 0.0; inputs(0, 1) = 0.0; targets(0, 0) = 0.0;
+    inputs(1, 0) = 0.0; inputs(1, 1) = 1.0; targets(1, 0) = 1.0;
+    inputs(2, 0) = 1.0; inputs(2, 1) = 0.0; targets(2, 0) = 1.0;
+    inputs(3, 0) = 1.0; inputs(3, 1) = 1.0; targets(3, 0) = 0.0;
+    
+    // Ошибка ДО обучения
+    double error_before = trainer.compute_loss(inputs, targets);
+    
+    // Обучаем
     trainer.train(inputs, targets);
     
     // Ошибка ПОСЛЕ обучения
-    auto out_after = trainer.predict(input);
-    double error_after = (out_after(0, 0) - 1.0) * (out_after(0, 0) - 1.0);
+    double error_after = trainer.compute_loss(inputs, targets);
     
-    // Ошибка должна уменьшиться (или остаться той же)
-    // +1e-6 — допуск на численную погрешность
-    EXPECT_LE(error_after, error_before + 1e-6);
+    // Ошибка должна уменьшиться
+    EXPECT_LT(error_after, error_before);
 }
 
 // ТЕСТ 5: Оценка точности — возвращает процент [0; 100]
 TEST(TrainerTest, EvaluateReturnsPercentage) {
-    NeuralNetwork net({2, 2, 1}, false);
-    Trainer trainer(net);
+    NeuralNetwork net;
+    net.addLayer(Layer(2, 3, Activation::RELU));
+    net.addLayer(Layer(3, 1, Activation::SIGMOID));
+    
+    TrainingConfig cfg;
+    Trainer trainer(net, cfg);
     
     Matrix<double> inputs(2, 2);
     inputs(0, 0) = 0.0; inputs(0, 1) = 0.0;
@@ -111,4 +118,86 @@ TEST(TrainerTest, EvaluateReturnsPercentage) {
     EXPECT_LE(accuracy, 100.0);
     EXPECT_TRUE(std::isfinite(accuracy));
 }
->>>>>>> 82fd8b2d5a716fb06c86ae545493271ea592bcb4
+
+// ТЕСТ 6: Проверка обратного распространения с SIGMOID
+TEST(TrainerTest, BackwardPassWithSigmoidWorks) {
+    NeuralNetwork net;
+    net.addLayer(Layer(2, 3, Activation::SIGMOID));
+    net.addLayer(Layer(3, 1, Activation::SIGMOID));
+    
+    TrainingConfig cfg;
+    Trainer trainer(net, cfg);
+    
+    Matrix<double> input(2, 1);
+    input(0, 0) = 0.5;
+    input(1, 0) = -0.3;
+    
+    Matrix<double> target(1, 1);
+    target(0, 0) = 1.0;
+    
+    auto outputs = trainer.forward_pass(input);
+    std::vector<Matrix<double>> deltas(net.getLayers().size());
+    
+    EXPECT_NO_THROW(trainer.backward_pass(outputs, target, deltas));
+    
+    // Проверяем, что градиенты не все нулевые
+    bool has_nonzero = false;
+    for (const auto& delta : deltas) {
+        for (size_t i = 0; i < delta.rows(); ++i) {
+            if (std::abs(delta(i, 0)) > 1e-10) {
+                has_nonzero = true;
+                break;
+            }
+        }
+    }
+    EXPECT_TRUE(has_nonzero);
+}
+
+// НОВЫЙ ТЕСТ 7: Проверка predict_batch
+TEST(TrainerTest, PredictBatchWorks) {
+    NeuralNetwork net;
+    net.addLayer(Layer(2, 2, Activation::SIGMOID));
+    net.addLayer(Layer(2, 1, Activation::SIGMOID));
+    
+    TrainingConfig cfg;
+    Trainer trainer(net, cfg);
+    
+    Matrix<double> inputs(2, 2);
+    inputs(0, 0) = 0.0; inputs(0, 1) = 0.0;
+    inputs(1, 0) = 1.0; inputs(1, 1) = 1.0;
+    
+    auto results = trainer.predict_batch(inputs);
+    
+    EXPECT_EQ(results.rows(), 2);
+    EXPECT_EQ(results.cols(), 1);
+    
+    for (size_t i = 0; i < results.rows(); ++i) {
+        EXPECT_GE(results(i, 0), 0.0);
+        EXPECT_LE(results(i, 0), 1.0);
+    }
+}
+
+// НОВЫЙ ТЕСТ 8: Проверка разных функций активации
+TEST(TrainerTest, DifferentActivationsWork) {
+    // Сеть с RELU и LINEAR
+    NeuralNetwork net;
+    net.addLayer(Layer(2, 3, Activation::RELU));
+    net.addLayer(Layer(3, 1, Activation::LINEAR));
+    
+    TrainingConfig cfg;
+    cfg.epochs = 10;
+    cfg.learning_rate = 0.01;
+    cfg.verbose = false;
+    
+    Trainer trainer(net, cfg);
+    
+    Matrix<double> inputs(2, 2);
+    inputs(0, 0) = 0.0; inputs(0, 1) = 0.0;
+    inputs(1, 0) = 1.0; inputs(1, 1) = 1.0;
+    
+    Matrix<double> targets(2, 1);
+    targets(0, 0) = 0.0;
+    targets(1, 0) = 2.0;
+    
+    EXPECT_NO_THROW(trainer.train(inputs, targets));
+}

@@ -4,9 +4,9 @@
             "name": "Mac",
             "includePath": [
                 "${workspaceFolder}/**",
-                "${workspaceFolder}/..",
-                "${workspaceFolder}/../class/Matrix",
-                "${workspaceFolder}/../parser"
+                "${workspaceFolder}/.."
+                // "${workspaceFolder}/../class/Matrix",
+                // "${workspaceFolder}/../parser"
             ],
             "defines": [],
             "compilerPath": "/usr/bin/clang++",

@@ -14,8 +14,7 @@
 enum class Activation {
     SIGMOID,
     RELU,
-    LINEAR,
-    SOFTMAX
+    LINEAR
 };
 
 // Структура слоя

@@ -100,4 +100,4 @@ public:
     void setConfig(const TrainingConfig& new_config) { config = new_config; }
 };
 
-#endif // TRAINER_H
+#endif

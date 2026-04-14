@@ -32,35 +32,9 @@ namespace {
         return error;
     }
 
-    // Cross-Entropy ошибка (для softmax)
-    double compute_cross_entropy(const Matrix<double>& output, const Matrix<double>& target) {
-        double loss = 0.0;
-        const double eps = 1e-15;
-        for (size_t j = 0; j < output.rows(); ++j) {
-            double out_val = max(min(output(j, 0), 1.0 - eps), eps);
-            if (target(j, 0) > 0.5) {
-                loss -= log(out_val);
-            }
-        }
-        return loss;
-    }
-
     // Пороговая классификация (только для бинарного случая)
     int threshold(double value) {
         return (value > 0.5) ? 1 : 0;
-    }
-
-    // Argmax для мультиклассовой классификации
-    int argmax(const Matrix<double>& vec) {
-        int max_idx = 0;
-        double max_val = vec(0, 0);
-        for (size_t i = 1; i < vec.rows(); ++i) {
-            if (vec(i, 0) > max_val) {
-                max_val = vec(i, 0);
-                max_idx = static_cast<int>(i);
-            }
-        }
-        return max_idx;
     }
 }
 
@@ -132,13 +106,7 @@ void Trainer::backward_pass(
     const auto& last_layer = layers[num_layers - 1];
     Matrix<double> output_delta(output.rows(), 1);
 
-    if (last_layer.activation == Activation::SOFTMAX) {
-        // Softmax + CrossEntropy
-        for (size_t j = 0; j < output.rows(); ++j) {
-            output_delta(j, 0) = output(j, 0) - target(j, 0);
-        }
-    }
-    else if (last_layer.activation == Activation::SIGMOID) {
+    if (last_layer.activation == Activation::SIGMOID) {
         // Sigmoid + MSE (нужно учитывать производную)
         for (size_t j = 0; j < output.rows(); ++j) {
             double out_val = output(j, 0);
@@ -247,12 +215,7 @@ double Trainer::train_on_sample(const Matrix<double>& input, const Matrix<double
     
     // Выбираем функцию потерь в зависимости от активации выхода
     double error = 0.0;
-    const auto& last_layer = network.getLayers().back();
-    if (last_layer.activation == Activation::SOFTMAX) {
-        error = compute_cross_entropy(output, target);
-    } else {
-        error = compute_mse(output, target);
-    }
+    error = compute_mse(output, target);
 
     vector<Matrix<double>> deltas(network.getLayers().size());
     backward_pass(layer_outputs, target, deltas);
@@ -363,14 +326,6 @@ double Trainer::evaluate(const Matrix<double>& inputs, const Matrix<double>& tar
                 correct++;
             }
         }
-        // Для мультиклассовой классификации (one-hot)
-        else {
-            int predicted = argmax(output);
-            int actual = argmax(extract_column(targets, i));
-            if (predicted == actual) {
-                correct++;
-            }
-        }
     }
 
     return 100.0 * correct / inputs.rows();
@@ -473,12 +428,8 @@ double Trainer::compute_loss(const Matrix<double>& inputs, const Matrix<double>&
         
         vector<Matrix<double>> layer_outputs = forward_pass(input);
         const Matrix<double>& output = layer_outputs.back();
-        
-        if (last_layer.activation == Activation::SOFTMAX) {
-            total_loss += compute_cross_entropy(output, target);
-        } else {
-            total_loss += compute_mse(output, target);
-        }
+
+        total_loss += compute_mse(output, target);
     }
     
     return total_loss / inputs.rows();
