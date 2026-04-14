@@ -153,7 +153,7 @@ TEST(TrainerTest, BackwardPassWithSigmoidWorks) {
     EXPECT_TRUE(has_nonzero);
 }
 
-// НОВЫЙ ТЕСТ 7: Проверка predict_batch
+// ТЕСТ 7: Проверка predict_batch
 TEST(TrainerTest, PredictBatchWorks) {
     NeuralNetwork net;
     net.addLayer(Layer(2, 2, Activation::SIGMOID));
@@ -177,7 +177,7 @@ TEST(TrainerTest, PredictBatchWorks) {
     }
 }
 
-// НОВЫЙ ТЕСТ 8: Проверка разных функций активации
+// ТЕСТ 8: Проверка разных функций активации
 TEST(TrainerTest, DifferentActivationsWork) {
     // Сеть с RELU и LINEAR
     NeuralNetwork net;
