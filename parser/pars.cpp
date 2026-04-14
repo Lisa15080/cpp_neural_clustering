@@ -194,8 +194,6 @@ Matrix<double> CSVParser::loadToMatrix(const std::string& filename) const {
     return result;
 }
 
-// СПЕЦИАЛИЗИРОВАННЫЙ МЕТОД ДЛЯ 2D КЛАССИФИКАЦИИ
-// Предполагает формат: x, y, class
 Datasetpars<double> CSVParser::loadClassification2D(const std::string& filename) const {
     Matrix<double> all_data = loadToMatrix(filename);
     
