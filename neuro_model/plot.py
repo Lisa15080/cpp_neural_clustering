@@ -1,4 +1,3 @@
-# plot.py
 import json
 import matplotlib.pyplot as plt
 import os
@@ -28,5 +27,5 @@ ax2.set_aspect('equal')
 
 plt.tight_layout()
 plt.savefig(os.path.join(base_dir, 'result.png'), dpi=150)
-print("✅ Готово: result.png")
+print("Готово: result.png")
 plt.show()

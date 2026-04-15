@@ -31,27 +31,8 @@ double NeuralNetwork::linearDerivative(double /*x*/) {
     return 1.0;
 }
 
-void NeuralNetwork::softmax(Matrix<double>& mat) {
-    for (size_t col = 0; col < mat.cols(); ++col) {
-        double maxVal = mat(0, col);
-        for (size_t row = 1; row < mat.rows(); ++row)
-            if (mat(row, col) > maxVal) maxVal = mat(row, col);
-        double sumExp = 0.0;
-        for (size_t row = 0; row < mat.rows(); ++row) {
-            double val = exp(mat(row, col) - maxVal);
-            mat(row, col) = val;
-            sumExp += val;
-        }
-        for (size_t row = 0; row < mat.rows(); ++row)
-            mat(row, col) /= sumExp;
-    }
-}
 
 void NeuralNetwork::applyActivation(Matrix<double>& mat, Activation act) {
-    if (act == Activation::SOFTMAX) {
-        softmax(mat);
-        return;
-    }
     for (size_t i = 0; i < mat.rows(); ++i)
         for (size_t j = 0; j < mat.cols(); ++j) {
             double x = mat(i, j);
@@ -65,8 +46,6 @@ void NeuralNetwork::applyActivation(Matrix<double>& mat, Activation act) {
 }
 
 void NeuralNetwork::applyActivationDerivative(Matrix<double>& mat, Activation act) {
-    if (act == Activation::SOFTMAX)
-        throw runtime_error("Производная SOFTMAX не реализована напрямую.");
     for (size_t i = 0; i < mat.rows(); ++i)
         for (size_t j = 0; j < mat.cols(); ++j) {
             double x = mat(i, j);
@@ -212,7 +191,7 @@ void NeuralNetwork::backward(const vector<double>& x,
         throw runtime_error("backward: размер целевого вектора не совпадает.");
     const Layer& last = layers[L-1];
     Matrix<double> delta(last.a.rows(), 1);
-    if (last.activation == Activation::SOFTMAX || last.activation == Activation::SIGMOID) {
+    if (last.activation == Activation::SIGMOID) {
         for (size_t i = 0; i < delta.rows(); ++i)
             delta(i, 0) = last.a(i, 0) - y_true[i];
     } else {
@@ -235,8 +214,6 @@ void NeuralNetwork::backward(const vector<double>& x,
             Matrix<double> W_T = layer.weights.transpose();
             Matrix<double> newDelta = W_T * delta;
             const Layer& prevLayer = layers[l-1];
-            if (prevLayer.activation == Activation::SOFTMAX)
-                throw runtime_error("backward: SOFTMAX на скрытом слое не поддерживается.");
             for (size_t i = 0; i < newDelta.rows(); ++i) {
                 double z_val = prevLayer.z(i, 0);
                 double deriv = 0.0;
@@ -369,7 +346,6 @@ void NeuralNetwork::printLayers() {
             case Activation::SIGMOID: msg += "SIGMOID"; break;
             case Activation::RELU:    msg += "RELU";    break;
             case Activation::LINEAR:  msg += "LINEAR";  break;
-            case Activation::SOFTMAX: msg += "SOFTMAX"; break;
         }
         msg += " | веса " + to_string(layers[l].weights.rows()) + "x" +
                to_string(layers[l].weights.cols()) + "\n";
