@@ -1,124 +1,100 @@
-# 📚 Инструкция по работе с библиотекой CSVParser
+neural_net.h - заголовочная часть
+neurp.cpp - сама модель
+main.cpp - тесты
 
-## Подключение
 
-```cpp
-#include "pars.h"
-```
+Результаты обучения на данных из Kegal
+C:\Users\annys\CLionProjects\cpp_neural_clustering\cmake-build-debug\main.exe
+=== Нейронная сеть - бинарная классификация (Bank Churn) ===
+Текущая папка: C:\Users\annys\CLionProjects\cpp_neural_clustering\cmake-build-debug
 
-## Структуры данных
+[1] Загрузка данных...
+Train: загружено 165034 примеров, 11 признаков
+Класс 0: 130113, класс 1: 34921
+Дисбаланс: 0.27:1 (class1/class0)
+Test: загружено 110023 примеров, 11 признаков
 
-### Dataset<T>
-```cpp
-template<typename T>
-struct Dataset {
-    Matrix<T> inputs;           // Входные признаки
-    Matrix<T> targets;          // Целевые переменные
-    std::vector<std::string> headers;  // Заголовки колонок
-};
-```
+[2] Нормализация данных...
+Нормализация завершена
 
-### TrainTestSplit
-```cpp
-struct TrainTestSplit {
-    Matrix<double> X_train;     // Обучающие признаки
-    Matrix<double> X_test;      // Тестовые признаки
-    Matrix<double> y_train;     // Обучающие цели
-    Matrix<double> y_test;      // Тестовые цели
-};
-```
+[3] Разделение данных:
+- Train samples: 132028
+- Validation samples: 33006
 
-## Инициализация
+[4] Создание сети (архитектура: 11 -> 32 -> 16 -> 1)
+Лог нейросети
+Архитектура: 11 32 16 1
+Сеть создана.
 
-```cpp
-// С разделителем-запятой и заголовком
-CSVParser parser(',', true);
 
-// С разделителем-точкой с запятой без заголовка
-CSVParser parser2(';', false);
+[5] Обучение...
 
-// По умолчанию: разделитель ',', есть заголовок
-CSVParser parser3;
-```
+===== НАЧАЛО ОБУЧЕНИЯ =====
+Эпох: 300
+Скорость обучения: 0.01
+Примеров: 132028
+Размер входа: 11
+Размер выхода: 1
 
-## Основные методы
+Эпоха 1 - Средняя ошибка: 0.117743
+Эпоха 100 - Средняя ошибка: 0.097720
+Эпоха 200 - Средняя ошибка: 0.097448
+Эпоха 300 - Средняя ошибка: 0.097263
 
-### 1. `loadClassification2D()` - для 2D классификации
-```cpp
-Dataset<double> loadClassification2D(const std::string& filename) const;
-```
-**Формат CSV:** `x, y, class`
-- Автоматически определяет колонки (0=x, 1=y, 2=class)
-- Выводит статистику датасета
+===== ОБУЧЕНИЕ ЗАВЕРШЕНО =====
 
-### 2. `loadTrainingData()` - с указанием колонок
-```cpp
-Dataset<double> loadTrainingData(
-    const std::string& filename,
-    const std::vector<int>& input_columns,
-    const std::vector<int>& target_columns
-) const;
-```
 
-### 3. `loadTrainingDataAuto()` - автоопределение цели
-```cpp
-Dataset<double> loadTrainingDataAuto(const std::string& filename) const;
-```
-- Последняя колонка становится целевой
+[6] Точность на валидационных данных: 86.08%
+Точность на обучающих данных: 86.78%
 
-### 4. `loadInputsOnly()` - только входные данные
-```cpp
-Matrix<double> loadInputsOnly(
-    const std::string& filename,
-    const std::vector<int>& input_columns
-) const;
-```
+[7] Предсказание для тестовых данных...
+✓ Предсказания сохранены в submission.csv
 
-### 5. `splitTrainTest()` - разделение на train/test
-```cpp
-TrainTestSplit splitTrainTest(
-    const Matrix<double>& X,
-    const Matrix<double>& y,
-    double test_ratio = 0.2,
-    bool shuffle = true
-) const;
-```
+[8] Примеры предсказаний (первые 10):
+Пример    1 -> P(1) = 0.0287, класс: 0
+Пример    2 -> P(1) = 0.8759, класс: 1
+Пример    3 -> P(1) = 0.0503, класс: 0
+Пример    4 -> P(1) = 0.2829, класс: 0
+Пример    5 -> P(1) = 0.2656, класс: 0
+Пример    6 -> P(1) = 0.0273, класс: 0
+Пример    7 -> P(1) = 0.0187, класс: 0
+Пример    8 -> P(1) = 0.2082, класс: 0
+Пример    9 -> P(1) = 0.4307, класс: 0
+Пример   10 -> P(1) = 0.0087, класс: 0
+Модель сохранена: churn_model.txt
 
-### 6. `getHeaders()` - получение заголовков
-```cpp
-std::vector<std::string> getHeaders(const std::string& filename) const;
-```
+[9] Модель сохранена в churn_model.txt
 
-### 7. `loadToMatrix()` - загрузка в матрицу
-```cpp
-Matrix<double> loadToMatrix(const std::string& filename) const;
-```
+=== Итоговая статистика ===
+- Лучшая точность на валидации: 86.0783%
+- Файлы созданы: submission.csv, churn_model.txt, log.txt
 
-## Обработка ошибок
+=== Программа успешно завершена ===
 
-Библиотека выбрасывает исключения `std::runtime_error` в следующих случаях:
+# Схема работы нейронной сети (2 → 32 → 16 → 1)
 
-```cpp
-try {
-    auto data = parser.loadClassification2D("nonexistent.csv");
-} catch (const std::runtime_error& e) {
-    // Файл не найден
-    std::cerr << "File error: " << e.what() << std::endl;
-}
+### Общая архитектура сети
+                    ┌─────────────────────────────────────────┐
+                    │            ВХОДНОЙ СЛОЙ (2)              │
+                    └────────────────────┬────────────────────┘
+                                         │
+                    ┌────────────────────▼────────────────────┐
+                    │         СКРЫТЫЙ СЛОЙ 1 (32)             │
+                    │              Активация: RELU            │
+                    └────────────────────┬────────────────────┘
+                                         │
+                    ┌────────────────────▼────────────────────┐
+                    │         СКРЫТЫЙ СЛОЙ 2 (16)             │
+                    │              Активация: RELU            │
+                    └────────────────────┬────────────────────┘
+                                         │
+                    ┌────────────────────▼────────────────────┐
+                    │          ВЫХОДНОЙ СЛОЙ (1)              │
+                    │           Активация: SIGMOID            │
+                    └────────────────────┬────────────────────┘
+                                         │
+                                         ▼
+                                    Предсказание
+                                     (0..1)
 
-try {
-    auto data = parser.loadClassification2D("wrong_format.csv");
-} catch (const std::runtime_error& e) {
-    // Неверный формат (меньше 3 колонок)
-    std::cerr << "Format error: " << e.what() << std::endl;
-}
-
-try {
-    std::vector<int> inputs = {0, 1, 10};  // колонка 10 не существует
-    auto data = parser.loadTrainingData("data.csv", inputs, {2});
-} catch (const std::runtime_error& e) {
-    // Выход за границы колонок
-    std::cerr << "Column error: " << e.what() << std::endl;
-}
-```
 
