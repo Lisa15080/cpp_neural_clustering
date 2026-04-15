@@ -191,7 +191,7 @@ int main() {
 
         // Обучение
         cout << "\n[5] Обучение...\n";
-        cfg.epochs = 300;
+        cfg.epochs = 1000;
         cfg.learning_rate = 0.01;
         cfg.verbose = true;
 
