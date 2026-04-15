@@ -1,8 +1,47 @@
-neural_net.h - заголовочная часть
-neurp.cpp - сама модель
-main.cpp - тесты
+# Лабораторные работы №1,2 по C++
+Реализация полносвязной нейронной сети на C++ без использования сторонних библиотек глубокого обучения. Проект включает кастомный класс для работы с матрицами, парсер CSV, генератор синтетических данных и  тренер.
 
+## Структура проекта
+cpp_neural_clustering
+├── class
+│   └── Matrix # Математическое ядро
+│       ├── matrix.cpp
+│       └── matrix.h
+├── CMakeLists.txt
+├── Kegal_detaset # Датасеты с Kaggle
+│   ├── circles_detaset.csv
+│   ├── test.csv
+│   └── train.csv
+├── neuro_model
+│   ├── DataSet #Генерация данных
+│   │   ├── dataset.cpp
+│   │   ├── dataset.h
+│   │   └── README.md
+│   ├── main.cpp
+│   ├── Neural_Net #Ядро нейронной сети
+│   │   ├── neural_net.cpp
+│   │   ├── neural_net.h
+│   │   └── README.md
+│   ├── readme.md
+│   └── Trainer_class # Логика обучения
+│       ├── README.md
+│       ├── trainer.cpp
+│       └── trainer.h
+├── parser # Парсер для работы с внешними данными
+│   ├── pars.cpp
+│   ├── pars.h
+│   └── README.md
+├── README.md
+└── test #  Модульные тесты
+    ├── test_matrix.cpp
+    ├── test_neural_net.cpp
+    └── test_trainer.cpp
 
+## Основные ветки 
+- main.cpp - обучение на датасете из Kaggle
+- cintetic_data - обучение на синтетических данных
+
+## Результаты обучения
 Результаты обучения на данных из Kegal
 C:\Users\annys\CLionProjects\cpp_neural_clustering\cmake-build-debug\main.exe
 === Нейронная сеть - бинарная классификация (Bank Churn) ===
@@ -71,7 +110,7 @@ Test: загружено 110023 примеров, 11 признаков
 
 === Программа успешно завершена ===
 
-# Схема работы нейронной сети (2 → 32 → 16 → 1)
+## Схема работы нейронной сети (2 → 32 → 16 → 1)
 
 ### Общая архитектура сети
                     ┌─────────────────────────────────────────┐
