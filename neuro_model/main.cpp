@@ -322,7 +322,7 @@ int main() {
         cout << "  - Файлы созданы: submission.csv, churn_model.txt, log.txt\n";
 
     } catch (const exception& e) {
-        cerr << "\n❌ Ошибка: " << e.what() << "\n";
+        cerr << "\n Ошибка: " << e.what() << "\n";
         return 1;
     }
 
