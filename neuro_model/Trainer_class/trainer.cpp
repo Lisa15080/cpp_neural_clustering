@@ -32,7 +32,7 @@ namespace {
         return error;
     }
 
-    // Пороговая классификация (только для бинарного случая)
+    // Пороговая классификация
     int threshold(double value) {
         return (value > 0.5) ? 1 : 0;
     }
@@ -297,7 +297,7 @@ void Trainer::train(const Dataset& data) {
     train(data.inputs, data.targets);
 }
 
-// ===== ОЦЕНКА ТОЧНОСТИ (ВЕРСИЯ С MATRIX) =====
+// ===== ОЦЕНКА ТОЧНОСТИ =====
 double Trainer::evaluate(const Matrix<double>& inputs, const Matrix<double>& targets) const {
     if (inputs.rows() != targets.rows()) {
         throw invalid_argument(
@@ -313,7 +313,6 @@ double Trainer::evaluate(const Matrix<double>& inputs, const Matrix<double>& tar
         vector<Matrix<double>> layer_outputs = forward_pass(input);
         const Matrix<double>& output = layer_outputs.back();
 
-        // Для бинарной классификации (один выходной нейрон)
         if (output.cols() == 1 && output.rows() == 1) {
             double pred_value = output(0, 0);
             double target_value = targets(i, 0);
@@ -407,7 +406,7 @@ Matrix<double> Trainer::predict_batch(const Matrix<double>& inputs) const {
     for (size_t i = 0; i < inputs.rows(); ++i) {
         Matrix<double> input = extract_column(inputs, i);
         Matrix<double> output = predict(input);
-        results(i, 0) = output(0, 0);  // для бинарного случая
+        results(i, 0) = output(0, 0);
     }
     
     return results;

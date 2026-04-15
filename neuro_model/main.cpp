@@ -127,10 +127,10 @@ vector<double> processCategoricalRow(const vector<string>& row, const vector<str
             features.push_back(it != gender_map.end() ? it->second : 0);
         }
         else if (header == "RowNumber" || header == "CustomerId" || header == "Surname") {
-            continue;  // пропускаем
+            continue;
         }
         else if (header == "Exited") {
-            continue;  // цель, обработаем отдельно
+            continue;
         }
         else {
             try {
@@ -190,7 +190,7 @@ int main() {
             vector<double> features = processCategoricalRow(row, headers);
             train_features.push_back(features);
 
-            // Находим целевое значение (колонка Exited)
+            // Находим целевое значение
             for (size_t i = 0; i < headers.size(); ++i) {
                 if (headers[i] == "Exited" && i < row.size()) {
                     try {
@@ -218,7 +218,7 @@ int main() {
 
         // Читаем test.csv
         ifstream test_stream(test_file);
-        getline(test_stream, line); // пропускаем заголовок
+        getline(test_stream, line);
 
         vector<vector<double>> test_features;
 

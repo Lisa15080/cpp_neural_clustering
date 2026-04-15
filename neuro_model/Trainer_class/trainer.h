@@ -26,7 +26,7 @@ private:
     // Прямой проход с сохранением всех промежуточных значений
     std::vector<Matrix<double>> forward_pass(const Matrix<double>& input) const;
 
-    // Обратный проход (backpropagation)
+    // Обратный проход
     void backward_pass(
         const std::vector<Matrix<double>>& layer_outputs,
         const Matrix<double>& target,
@@ -39,7 +39,7 @@ private:
         const std::vector<Matrix<double>>& deltas
     );
 
-    // Обучение на одном примере (возвращает ошибку)
+    // Обучение на одном примере
     double train_on_sample(const Matrix<double>& input, const Matrix<double>& target);
 
 public:
@@ -96,7 +96,7 @@ public:
     // Получить текущие настройки
     const TrainingConfig& getConfig() const { return config; }
 
-    // Изменить настройки (например, скорость обучения во время тренировки)
+    // Изменить настройки
     void setConfig(const TrainingConfig& new_config) { config = new_config; }
 };
 
