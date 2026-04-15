@@ -277,7 +277,7 @@ int main() {
         cout << "\n[10] Запуск Python скрипта для визуализации...\n";
         int result = system("py ../neuro_model/plot.py");
         if (result == 0) {
-            cout << "  ✅ Визуализация завершена. Результат: result.png\n";
+            cout << "  ✅ Визуализация завершена\n";
         } else {
             cout << "  ⚠️ Не удалось запустить Python. Убедитесь, что Python установлен.\n";
         }

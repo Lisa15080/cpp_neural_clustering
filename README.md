@@ -1,124 +1,72 @@
-# 📚 Инструкция по работе с библиотекой CSVParser
+neural_net.h - заголовочная часть
+neurp.cpp - сама модель
+main.cpp - тесты
 
-## Подключение
+Результат работы модели на синтетических бинарных данных
 
-```cpp
-#include "pars.h"
-```
+C:\Users\annys\CLionProjects\cpp_neural_clustering\cmake-build-debug\main.exe
+=== Нейронная сеть - бинарная классификация (Синтетические данные) ===
+Текущая папка: C:\Users\annys\CLionProjects\cpp_neural_clustering\cmake-build-debug
 
-## Структуры данных
+[1] Генерация синтетического датасета...
+- Сгенерировано примеров: 10000
+- Признаков: 2 (x, y)
+- Расстояние между центрами кластеров: 3
+- Стандартное отклонение: 0.8
+- Класс 0: 5000, класс 1: 5000
+- Дисбаланс: 1.00:1
 
-### Dataset<T>
-```cpp
-template<typename T>
-struct Dataset {
-    Matrix<T> inputs;           // Входные признаки
-    Matrix<T> targets;          // Целевые переменные
-    std::vector<std::string> headers;  // Заголовки колонок
-};
-```
+[2] Нормализация данных...
+- Нормализация завершена
 
-### TrainTestSplit
-```cpp
-struct TrainTestSplit {
-    Matrix<double> X_train;     // Обучающие признаки
-    Matrix<double> X_test;      // Тестовые признаки
-    Matrix<double> y_train;     // Обучающие цели
-    Matrix<double> y_test;      // Тестовые цели
-};
-```
+[3] Разделение данных:
+- Train samples: 8000
+- Validation samples: 2000
 
-## Инициализация
+[4] Создание сети (архитектура: 2 -> 32 -> 16 -> 1)
+Лог нейросети
+Архитектура: 2 32 16 1
+Сеть создана.
 
-```cpp
-// С разделителем-запятой и заголовком
-CSVParser parser(',', true);
 
-// С разделителем-точкой с запятой без заголовка
-CSVParser parser2(';', false);
+[5] Обучение...
 
-// По умолчанию: разделитель ',', есть заголовок
-CSVParser parser3;
-```
+===== НАЧАЛО ОБУЧЕНИЯ =====
+Эпох: 300
+Скорость обучения: 0.01
+Примеров: 8000
+Размер входа: 2
+Размер выхода: 1
 
-## Основные методы
+Эпоха 1 - Средняя ошибка: 0.034561
+Эпоха 100 - Средняя ошибка: 0.013147
+Эпоха 200 - Средняя ошибка: 0.012972
+Эпоха 300 - Средняя ошибка: 0.012713
 
-### 1. `loadClassification2D()` - для 2D классификации
-```cpp
-Dataset<double> loadClassification2D(const std::string& filename) const;
-```
-**Формат CSV:** `x, y, class`
-- Автоматически определяет колонки (0=x, 1=y, 2=class)
-- Выводит статистику датасета
+===== ОБУЧЕНИЕ ЗАВЕРШЕНО =====
 
-### 2. `loadTrainingData()` - с указанием колонок
-```cpp
-Dataset<double> loadTrainingData(
-    const std::string& filename,
-    const std::vector<int>& input_columns,
-    const std::vector<int>& target_columns
-) const;
-```
 
-### 3. `loadTrainingDataAuto()` - автоопределение цели
-```cpp
-Dataset<double> loadTrainingDataAuto(const std::string& filename) const;
-```
-- Последняя колонка становится целевой
+[6] Точность на валидационных данных: 99.90%
+- Точность на обучающих данных: 86.14%
 
-### 4. `loadInputsOnly()` - только входные данные
-```cpp
-Matrix<double> loadInputsOnly(
-    const std::string& filename,
-    const std::vector<int>& input_columns
-) const;
-```
+[7] Примеры предсказаний (тестовые точки):
+Точка (2.00, 0.00) -> P(1) = 0.0004, класс: 0
+Точка (-2.00, 0.00) -> P(1) = 1.0000, класс: 1
+Точка (0.00, 0.00) -> P(1) = 0.9485, класс: 1
+Точка (1.50, 1.50) -> P(1) = 0.0010, класс: 0
+Точка (-1.50, -1.50) -> P(1) = 1.0000, класс: 1
+Модель сохранена: synthetic_model.txt
 
-### 5. `splitTrainTest()` - разделение на train/test
-```cpp
-TrainTestSplit splitTrainTest(
-    const Matrix<double>& X,
-    const Matrix<double>& y,
-    double test_ratio = 0.2,
-    bool shuffle = true
-) const;
-```
+[8] Модель сохранена в synthetic_model.txt
+- Данные сохранены в synthetic_data.csv (для визуализации)
 
-### 6. `getHeaders()` - получение заголовков
-```cpp
-std::vector<std::string> getHeaders(const std::string& filename) const;
-```
+=== Итоговая статистика ===
+- Архитектура сети: 2 → 32 → 16 → 1
+- Эпохи: 300
+- Learning rate: 0.0100
+- Точность на валидации: 99.9000%
+- Файлы созданы: synthetic_model.txt, log.txt, synthetic_data.csv
 
-### 7. `loadToMatrix()` - загрузка в матрицу
-```cpp
-Matrix<double> loadToMatrix(const std::string& filename) const;
-```
+=== Программа успешно завершена ===
 
-## Обработка ошибок
-
-Библиотека выбрасывает исключения `std::runtime_error` в следующих случаях:
-
-```cpp
-try {
-    auto data = parser.loadClassification2D("nonexistent.csv");
-} catch (const std::runtime_error& e) {
-    // Файл не найден
-    std::cerr << "File error: " << e.what() << std::endl;
-}
-
-try {
-    auto data = parser.loadClassification2D("wrong_format.csv");
-} catch (const std::runtime_error& e) {
-    // Неверный формат (меньше 3 колонок)
-    std::cerr << "Format error: " << e.what() << std::endl;
-}
-
-try {
-    std::vector<int> inputs = {0, 1, 10};  // колонка 10 не существует
-    auto data = parser.loadTrainingData("data.csv", inputs, {2});
-} catch (const std::runtime_error& e) {
-    // Выход за границы колонок
-    std::cerr << "Column error: " << e.what() << std::endl;
-}
-```
-
+Process finished with exit code 0
