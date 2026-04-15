@@ -154,7 +154,7 @@ void Trainer::backward_pass(
             delta(j, 0) = error_sum;
         }
 
-        // 👇 Применяем производную активации предыдущего слоя
+        // Применяем производную активации предыдущего слоя
         const auto& prevLayer = layers[l];
         Matrix<double> deriv = prevLayer.z;  // z с прямого прохода
         network.applyActivationDerivative(deriv, prevLayer.activation);
