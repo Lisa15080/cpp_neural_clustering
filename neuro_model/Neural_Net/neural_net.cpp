@@ -33,29 +33,30 @@ double NeuralNetwork::linearDerivative(double /*x*/) {
 
 
 void NeuralNetwork::applyActivation(Matrix<double>& mat, Activation act) {
+    double (*func)(double) = nullptr;
+    switch (act) {
+        case Activation::SIGMOID: func = sigmoid; break;
+        case Activation::RELU:    func = relu;    break;
+        case Activation::LINEAR:  func = linear;  break;
+        default: return;   // неизвестный тип
+    }
     for (size_t i = 0; i < mat.rows(); ++i)
-        for (size_t j = 0; j < mat.cols(); ++j) {
-            double x = mat(i, j);
-            switch (act) {
-                case Activation::SIGMOID: mat(i, j) = sigmoid(x); break;
-                case Activation::RELU:    mat(i, j) = relu(x);    break;
-                case Activation::LINEAR:  mat(i, j) = linear(x);  break;
-                default: break;
-            }
-        }
+        for (size_t j = 0; j < mat.cols(); ++j)
+            mat(i, j) = func(mat(i, j));
 }
 
+// Применяет производную активации ко всем элементам матрицы (in-place)
 void NeuralNetwork::applyActivationDerivative(Matrix<double>& mat, Activation act) {
+    double (*func)(double) = nullptr;
+    switch (act) {
+        case Activation::SIGMOID: func = sigmoidDerivative; break;
+        case Activation::RELU:    func = reluDerivative;    break;
+        case Activation::LINEAR:  func = linearDerivative;  break;
+        default: return;
+    }
     for (size_t i = 0; i < mat.rows(); ++i)
-        for (size_t j = 0; j < mat.cols(); ++j) {
-            double x = mat(i, j);
-            switch (act) {
-                case Activation::SIGMOID: mat(i, j) = sigmoidDerivative(x); break;
-                case Activation::RELU:    mat(i, j) = reluDerivative(x);    break;
-                case Activation::LINEAR:  mat(i, j) = linearDerivative(x);  break;
-                default: break;
-            }
-        }
+        for (size_t j = 0; j < mat.cols(); ++j)
+            mat(i, j) = func(mat(i, j));
 }
 
 // Логирование
