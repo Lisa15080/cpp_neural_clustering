@@ -80,7 +80,6 @@ public:
 
     void applyActivation(Matrix<double>& mat, Activation act);
     void applyActivationDerivative(Matrix<double>& mat, Activation act);
-    static void softmax(Matrix<double>& mat);
 
 private:
     std::vector<Layer> layers;
