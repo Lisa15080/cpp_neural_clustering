@@ -45,7 +45,6 @@ void NeuralNetwork::applyActivation(Matrix<double>& mat, Activation act) {
             mat(i, j) = func(mat(i, j));
 }
 
-// Применяет производную активации ко всем элементам матрицы (in-place)
 void NeuralNetwork::applyActivationDerivative(Matrix<double>& mat, Activation act) {
     double (*func)(double) = nullptr;
     switch (act) {
