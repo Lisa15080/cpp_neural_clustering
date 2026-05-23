@@ -236,9 +236,7 @@ double runDataset(const string& train_file) {
         cout << "Внимание: Только один класс в данных\n";
     }
 
-    // нормализация данных (z-score)
-    cout << "Нормализация данных";
-    fitNormalizeData(train_features);
+    cout << "Нормализация данных\n";
 
     // перемешивание данных (фиксированный seed для воспроизводимости)
     vector<size_t> idx(train_features.size());
@@ -264,6 +262,9 @@ double runDataset(const string& train_file) {
     vector<double> train_targ(train_targets.begin(), train_targets.begin() + train_size);
     vector<vector<double>> val_feat(train_features.begin() + train_size, train_features.end());
     vector<double> val_targ(train_targets.begin() + train_size, train_targets.end());
+
+    NormalizationParams norm_params = fitNormalizeData(train_feat);
+    normalizeDataWithParams(val_feat, norm_params);
 
     // формирование целевых векторов для тренера (ожидает вектор векторов)
     vector<vector<double>> train_targets_vec;
