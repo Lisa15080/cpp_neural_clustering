@@ -27,9 +27,10 @@ private:
     Matrix<double> extractColumns(const Matrix<double>& source, 
                                   const std::vector<int>& columns) const;
 
-    std::string cleanToken(const std::string& token) const;
+
 
 public:
+    std::string cleanToken(const std::string& token) const;
     // Конструктор
     CSVParser(char delimiter = ',', bool has_header = true);
     

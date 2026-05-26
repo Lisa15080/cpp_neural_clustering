@@ -1,8 +1,9 @@
+// подключение заголовочных файлов нейронной сети, тренера, матриц
 #include "Neural_Net/neural_net.h"
-#include "../Trainer_class/trainer.h"
+#include "Trainer_class/trainer.h"
 #include "../class/Matrix/matrix.h"
-#include "../DataSet/dataset.h"
 
+// стандартные библиотеки
 #include <iostream>
 #include <iomanip>
 #include <vector>
@@ -10,15 +11,22 @@
 #include <algorithm>
 #include <fstream>
 #include <cmath>
-#include "libs/json.hpp"
+#include <string>
+#include <sstream>
+#include <random>
 
 #ifdef _WIN32
     #include <direct.h>
+    #define getcwd _getcwd
+#else
+    #include <unistd.h>
 #endif
 
 using namespace std;
 
-// Получить текущую рабочую директорию
+// вспомогательные функции
+
+// возвращает текущую рабочую директорию (для отладки)
 string getCurrentPath() {
     char buffer[1024];
 #ifdef _WIN32
@@ -29,7 +37,7 @@ string getCurrentPath() {
     return ".";
 }
 
-// Преобразовать Matrix<double> в vector<vector<double>>
+// преобразование Matrix<double> в vector<vector<double>> (для совместимости)
 vector<vector<double>> matrixToVector(const Matrix<double>& mat) {
     vector<vector<double>> vec(mat.rows(), vector<double>(mat.cols()));
     for (size_t i = 0; i < mat.rows(); ++i)
@@ -38,7 +46,7 @@ vector<vector<double>> matrixToVector(const Matrix<double>& mat) {
     return vec;
 }
 
-// Преобразовать vector<vector<double>> в Matrix<double>
+// обратное преобразование
 Matrix<double> vectorToMatrix(const vector<vector<double>>& vec) {
     if (vec.empty()) return Matrix<double>();
     size_t rows = vec.size();
@@ -50,88 +58,262 @@ Matrix<double> vectorToMatrix(const vector<vector<double>>& vec) {
     return mat;
 }
 
-// Нормализация данных
-void normalizeData(vector<vector<double>>& inputs) {
-    if (inputs.empty() || inputs[0].empty()) return;
+// структура для хранения параметров нормализации (среднее и стандартное отклонение)
+struct NormalizationParams {
+    vector<double> mean;
+    vector<double> std;
+};
+
+// вычисляет среднее и стандартное отклонение по каждому признаку и нормализует входные данные
+NormalizationParams fitNormalizeData(vector<vector<double>>& inputs) {
+    NormalizationParams params;
+    if (inputs.empty() || inputs[0].empty()) return params;
 
     size_t n_samples = inputs.size();
     size_t n_features = inputs[0].size();
 
-    vector<double> mean(n_features, 0.0);
-    for (size_t i = 0; i < n_samples; ++i) {
-        for (size_t j = 0; j < n_features; ++j) {
-            mean[j] += inputs[i][j];
-        }
-    }
+    // среднее
+    params.mean.assign(n_features, 0.0);
+    for (size_t i = 0; i < n_samples; ++i)
+        for (size_t j = 0; j < n_features; ++j)
+            params.mean[j] += inputs[i][j];
+    for (size_t j = 0; j < n_features; ++j)
+        params.mean[j] /= n_samples;
+
+    // стандартное отклонение
+    params.std.assign(n_features, 0.0);
+    for (size_t i = 0; i < n_samples; ++i)
+        for (size_t j = 0; j < n_features; ++j)
+            params.std[j] += (inputs[i][j] - params.mean[j]) * (inputs[i][j] - params.mean[j]);
     for (size_t j = 0; j < n_features; ++j) {
-        mean[j] /= n_samples;
+        params.std[j] = sqrt(params.std[j] / n_samples);
+        if (params.std[j] < 1e-8) params.std[j] = 1.0;   // защита от деления на ноль
     }
 
-    vector<double> std(n_features, 0.0);
-    for (size_t i = 0; i < n_samples; ++i) {
-        for (size_t j = 0; j < n_features; ++j) {
-            std[j] += (inputs[i][j] - mean[j]) * (inputs[i][j] - mean[j]);
+    // нормализация (z-score)
+    for (size_t i = 0; i < n_samples; ++i)
+        for (size_t j = 0; j < n_features; ++j)
+            inputs[i][j] = (inputs[i][j] - params.mean[j]) / params.std[j];
+
+    return params;
+}
+
+// нормализует данные с уже готовыми параметрами
+void normalizeDataWithParams(vector<vector<double>>& inputs, const NormalizationParams& params) {
+    for (size_t i = 0; i < inputs.size(); ++i)
+        for (size_t j = 0; j < inputs[i].size(); ++j)
+            inputs[i][j] = (inputs[i][j] - params.mean[j]) / params.std[j];
+}
+
+// преобразует строку CSV в вектор чисел, пропуская столбец-цель (target_idx)
+vector<double> processDataRow(const vector<string>& row, int target_idx) {
+    vector<double> features;
+    for (size_t i = 0; i < row.size(); ++i) {
+        if ((int)i == target_idx) continue;   // не добавляем целевую переменную в признаки
+        try {
+            features.push_back(stod(row[i]));   // преобразуем строку в double
+        } catch (...) {
+            features.push_back(0.0);            // при ошибке вставляем 0
         }
     }
-    for (size_t j = 0; j < n_features; ++j) {
-        std[j] = sqrt(std[j] / n_samples);
-        if (std[j] < 1e-8) std[j] = 1.0;
+    return features;
+}
+
+// вычисление F1-меры (среднее гармоническое между точностью и полнотой)
+double calcF1(Trainer& trainer,
+              const vector<vector<double>>& X,
+              const vector<double>& y,
+              double threshold = 0.5) {
+    int tp = 0, fp = 0, fn = 0;   // True Positive, False Positive, False Negative
+
+    for (size_t i = 0; i < X.size(); ++i) {
+        vector<double> out = trainer.predict(X[i]);   // предсказание сети
+        int pred = (out[0] > threshold) ? 1 : 0;
+        int real = (y[i] > 0.5) ? 1 : 0;
+
+        if (pred == 1 && real == 1) tp++;
+        if (pred == 1 && real == 0) fp++;
+        if (pred == 0 && real == 1) fn++;
     }
 
-    for (size_t i = 0; i < n_samples; ++i) {
-        for (size_t j = 0; j < n_features; ++j) {
-            inputs[i][j] = (inputs[i][j] - mean[j]) / std[j];
+    double precision = (tp + fp == 0) ? 0.0 : (double)tp / (tp + fp);
+    double recall    = (tp + fn == 0) ? 0.0 : (double)tp / (tp + fn);
+
+    if (precision + recall == 0.0) return 0.0;
+    return 2.0 * precision * recall / (precision + recall);
+}
+
+// обучение и оценка на одном датасете
+
+double runDataset(const string& train_file) {
+    cout << "\n==============================\n";
+    cout << "Dataset: " << train_file << "\n";
+
+    // открываем файл
+    ifstream train_stream(train_file);
+    if (!train_stream.is_open()) {
+        throw runtime_error("Не удалось открыть файл: " + train_file);
+    }
+
+    string line;
+    // читаем первую строку - заголовки
+    getline(train_stream, line);
+    vector<string> headers;
+    stringstream header_ss(line);
+    string token;
+
+    // определяем разделитель
+    char delimiter = '\t';
+    if (line.find(',') != string::npos && line.find('\t') == string::npos) {
+        delimiter = ',';
+    }
+
+    // разбираем заголовки
+    while (getline(header_ss, token, delimiter)) {
+        headers.push_back(token);
+    }
+
+    // ищем столбец с целевой переменной
+    int target_idx = -1;
+    for (size_t i = 0; i < headers.size(); ++i) {
+        if (headers[i] == "target" || headers[i] == "Exited") {
+            target_idx = i;
+            break;
         }
     }
-}
-
-// Функция для разделения данных на train и validation
-void trainValidationSplit(const vector<vector<double>>& features,
-                          const vector<vector<double>>& targets,
-                          vector<vector<double>>& train_features,
-                          vector<vector<double>>& train_targets,
-                          vector<vector<double>>& val_features,
-                          vector<vector<double>>& val_targets,
-                          double val_ratio = 0.2) {
-    size_t total = features.size();
-    size_t val_size = static_cast<size_t>(total * val_ratio);
-    size_t train_size = total - val_size;
-
-    train_features.assign(features.begin(), features.begin() + train_size);
-    train_targets.assign(targets.begin(), targets.begin() + train_size);
-    val_features.assign(features.begin() + train_size, features.end());
-    val_targets.assign(targets.begin() + train_size, targets.end());
-}
-
-void saveToJSON(const vector<vector<double>>& inputs,
-                const vector<vector<double>>& targets,
-                const string& filename) {
-    nlohmann::json data;
-    vector<double> x, y, labels;
-
-    for (size_t i = 0; i < inputs.size(); ++i) {
-        x.push_back(inputs[i][0]);
-        y.push_back(inputs[i][1]);
-        labels.push_back(targets[i][0]);
+    // если не найден - считаем последний столбец целевым
+    if (target_idx == -1 && !headers.empty()) {
+        target_idx = headers.size() - 1;
+        cout << "Столбец 'target' не найден, использую последний столбец как целевой\n";
     }
 
-    data["x"] = x;
-    data["y"] = y;
-    data["labels"] = labels;
+    // диагностическая информация
+    cout << "Целевой столбец: " << headers[target_idx] << " (индекс " << target_idx << ")\n";
 
-    ofstream file(filename);
-    file << data.dump(4);
-    file.close();
+    vector<vector<double>> train_features;   // признаки (входы)
+    vector<double> train_targets;            // целевые значения
+
+    // построчное чтение данных
+    while (getline(train_stream, line)) {
+        if (line.empty()) continue;
+        stringstream ss(line);
+        vector<string> row;
+        while (getline(ss, token, delimiter)) {
+            row.push_back(token);
+        }
+        if (row.size() < 2) continue;   // недостаточно колонок - пропускаем
+
+        // извлекаем признаки (кроме целевого столбца)
+        vector<double> features = processDataRow(row, target_idx);
+        train_features.push_back(features);
+
+        // извлекаем целевое значение
+        if (target_idx >= 0 && target_idx < (int)row.size()) {
+            try {
+                train_targets.push_back(stod(row[target_idx]));
+            } catch (...) {
+                train_targets.push_back(0.0);
+            }
+        }
+    }
+    train_stream.close();
+
+    if (train_features.empty()) {
+        throw runtime_error("Не удалось загрузить данные из файла: " + train_file);
+    }
+
+    cout << "Загружено " << train_features.size()
+         << " примеров, " << train_features[0].size() << " признаков\n";
+
+    // подсчёт количества примеров каждого класса
+    int count0 = 0, count1 = 0;
+    for (double t : train_targets) {
+        if (t < 0.5) count0++;
+        else count1++;
+    }
+    cout << "Класс 0: " << count0 << ", класс 1: " << count1 << "\n";
+    if (count0 == 0 || count1 == 0) {
+        cout << "Внимание: Только один класс в данных\n";
+    }
+
+    cout << "Нормализация данных\n";
+
+    // перемешивание данных (фиксированный seed для воспроизводимости)
+    vector<size_t> idx(train_features.size());
+    iota(idx.begin(), idx.end(), 0);
+    mt19937 gen(42);
+    shuffle(idx.begin(), idx.end(), gen);
+
+    vector<vector<double>> shuffled_features;
+    vector<double> shuffled_targets;
+    for (size_t id : idx) {
+        shuffled_features.push_back(train_features[id]);
+        shuffled_targets.push_back(train_targets[id]);
+    }
+    train_features = shuffled_features;
+    train_targets = shuffled_targets;
+
+    // разделение на тренировочную (80%) и валидационную (20%) выборки
+    size_t total_samples = train_features.size();
+    size_t val_size = total_samples / 5;          // 20%
+    size_t train_size = total_samples - val_size; // 80%
+
+    vector<vector<double>> train_feat(train_features.begin(), train_features.begin() + train_size);
+    vector<double> train_targ(train_targets.begin(), train_targets.begin() + train_size);
+    vector<vector<double>> val_feat(train_features.begin() + train_size, train_features.end());
+    vector<double> val_targ(train_targets.begin() + train_size, train_targets.end());
+
+    NormalizationParams norm_params = fitNormalizeData(train_feat);
+    normalizeDataWithParams(val_feat, norm_params);
+
+    // формирование целевых векторов для тренера (ожидает вектор векторов)
+    vector<vector<double>> train_targets_vec;
+    for (double t : train_targ) {
+        train_targets_vec.push_back({t});
+    }
+
+    cout << "Разделение данных:";
+    cout << "Train samples: " << train_feat.size() << "\n";
+    cout << "Validation samples: " << val_feat.size() << "\n";
+
+    size_t n_features = train_feat[0].size();
+
+    // создание нейронной сети: количество нейронов на входе равно числу признаков,
+    // затем два скрытых слоя (16 и 8 нейронов) и выходной слой с 1 нейроном (бинарная классификация)
+    cout << "Создание сети: "
+         << n_features << " - 16 - 8 - 1\n";
+    NeuralNetwork net({(int)n_features, 16, 8, 1}, Activation::RELU, true, "log.txt");
+
+    // конфигурация обучения
+    TrainingConfig cfg;
+    cfg.epochs = 200;           // количество эпох
+    cfg.learning_rate = 0.01;   // скорость обучения
+    cfg.verbose = true;          // выводить прогресс
+
+    cout << "Обучение";
+    Trainer trainer(net, cfg);
+    trainer.train(train_feat, train_targets_vec);
+
+    // оценка качества на тренировочной и валидационной выборках
+    double train_f1 = calcF1(trainer, train_feat, train_targ, 0.5);
+    double val_f1   = calcF1(trainer, val_feat, val_targ, 0.5);
+
+    cout << "Результаты:";
+    cout << "F1 на train:      " << fixed << setprecision(4) << train_f1 << "\n";
+    cout << "F1 на validation: " << fixed << setprecision(4) << val_f1 << "\n";
+
+    return val_f1;   // возвращаем F1 на валидации (основная метрика)
 }
 
-// Главная программа
+// главная функция
+
 int main() {
 #ifdef _WIN32
-    system("chcp 65001 > nul");
+    system("chcp 65001 > nul");   // установка кодировки UTF-8 для Windows
 #endif
 
-    cout << "=== Нейронная сеть - бинарная классификация (Синтетические данные) ===\n";
-    cout << "Текущая папка: " << getCurrentPath() << "\n\n";
+    cout << "Нейронная сеть. Проверка F1 на датасетах";
+    cout << "Текущая папка: " << getCurrentPath() << "\n";
 
     // Объявляем переменные ДО try, чтобы они были доступны после
     Dataset synthetic_data;
@@ -140,153 +322,59 @@ int main() {
     TrainingConfig cfg;
 
     try {
-        cout << "[1] Генерация синтетического датасета...\n";
-
-        // Параметры датасета
-        size_t n_samples = 10000;      // 10000 точек
-        double cluster_std = 0.8;      // стандартное отклонение кластеров
-        double separation = 3.0;       // расстояние между центрами кластеров
-
-        // Генерируем данные с помощью DatasetGenerator
-        DatasetGenerator generator;
-        synthetic_data = generator.generate_gaussian(n_samples, cluster_std, separation);
-
-        cout << "  - Сгенерировано примеров: " << synthetic_data.inputs.size() << "\n";
-        cout << "  - Признаков: " << synthetic_data.inputs[0].size() << " (x, y)\n";
-        cout << "  - Расстояние между центрами кластеров: " << separation << "\n";
-        cout << "  - Стандартное отклонение: " << cluster_std << "\n";
-
-        // Подсчет классов
-        int count0 = 0, count1 = 0;
-        for (const auto& t : synthetic_data.targets) {
-            if (t[0] < 0.5) count0++;
-            else count1++;
-        }
-        cout << "  - Класс 0: " << count0 << ", класс 1: " << count1 << "\n";
-        cout << "  - Дисбаланс: " << fixed << setprecision(2)
-             << (double)count1 / count0 << ":1\n";
-
-        // Нормализация данных
-        cout << "\n[2] Нормализация данных...\n";
-        normalizeData(synthetic_data.inputs);
-        cout << "  - Нормализация завершена\n";
-
-        // Разделение на train (80%) и validation (20%)
-        vector<vector<double>> train_features, train_targets;
-        vector<vector<double>> val_features, val_targets;
-
-        trainValidationSplit(synthetic_data.inputs, synthetic_data.targets,
-                            train_features, train_targets,
-                            val_features, val_targets, 0.2);
-
-        cout << "\n[3] Разделение данных:\n";
-        cout << "  - Train samples: " << train_features.size() << "\n";
-        cout << "  - Validation samples: " << val_features.size() << "\n";
-
-        // Создание сети
-        size_t n_features = train_features[0].size();
-        cout << "\n[4] Создание сети (архитектура: " << n_features << " -> 32 -> 16 -> 1)\n";
-        NeuralNetwork net({(int)n_features, 32, 16, 1}, Activation::RELU, true, "log.txt");
-        net_ptr = &net;
-
-        // Обучение
-        cout << "\n[5] Обучение...\n";
-        cfg.epochs = 1000;
-        cfg.learning_rate = 0.01;
-        cfg.verbose = true;
-
-        Trainer trainer(net, cfg);
-        trainer_ptr = &trainer;
-        trainer.train(train_features, train_targets);
-
-        // Оценка на валидационных данных
-        Matrix<double> val_inputs_mat = vectorToMatrix(val_features);
-        Matrix<double> val_targets_mat = vectorToMatrix(val_targets);
-        double val_accuracy = trainer.evaluate(val_inputs_mat, val_targets_mat);
-        cout << "\n[6] Точность на валидационных данных: " << fixed << setprecision(2)
-             << val_accuracy << "%\n";
-
-        // Оценка на обучающих данных
-        Matrix<double> train_inputs_mat = vectorToMatrix(train_features);
-        Matrix<double> train_targets_mat = vectorToMatrix(train_targets);
-        double train_accuracy = trainer.evaluate(train_inputs_mat, train_targets_mat);
-        cout << "  - Точность на обучающих данных: " << fixed << setprecision(2)
-             << train_accuracy << "%\n";
-
-        // Визуализация разделяющей границы (тестовые точки)
-        cout << "\n[7] Примеры предсказаний (тестовые точки):\n";
-
-        // Создаем сетку точек для демонстрации
-        vector<vector<double>> test_points = {
-            {2.0, 0.0},   // около центра класса 0
-            {-2.0, 0.0},  // около центра класса 1
-            {0.0, 0.0},   // граница
-            {1.5, 1.5},   // дальняя точка
-            {-1.5, -1.5}  // дальняя точка
+        // Список путей к датасетам (файлы должны лежать в папке datasets)
+        vector<string> datasets = {
+            "datasets/dataset1.csv",   // первый датасет (2 признака)
+            "datasets/dataset2.csv",   // второй датасет (4 признака)
         };
 
-        for (const auto& pt : test_points) {
-            vector<double> out = trainer.predict(pt);
-            int pred = (out[0] > 0.5) ? 1 : 0;
-            cout << "  Точка (" << fixed << setprecision(2) << pt[0] << ", " << pt[1]
-                 << ") -> P(1) = " << setprecision(4) << out[0]
-                 << ", класс: " << pred << "\n";
+        // предварительная проверка существования файлов
+        for (const auto& file : datasets) {
+            ifstream test(file);
+            if (!test.is_open()) {
+                cout << "Файл не найден: " << file << "\n";
+            } else {
+                test.close();
+            }
         }
 
-        // Сохранение модели
-        net.saveModel("synthetic_model.txt");
-        cout << "\n[8] Модель сохранена в synthetic_model.txt\n";
+        vector<double> scores;
 
-        // Сохранение данных в CSV для визуализации
-        ofstream data_file("synthetic_data.csv");
-        data_file << "x,y,class\n";
-        for (size_t i = 0; i < synthetic_data.inputs.size(); ++i) {
-            data_file << synthetic_data.inputs[i][0] << ","
-                      << synthetic_data.inputs[i][1] << ","
-                      << synthetic_data.targets[i][0] << "\n";
+        // запуск обработки каждого существующего датасета
+        for (const string& file : datasets) {
+            ifstream check(file);
+            if (!check.is_open()) {
+                cout << "\nПропускаем файл: " << file << " (не найден)\n";
+                continue;
+            }
+            check.close();
+            double f1 = runDataset(file);
+            scores.push_back(f1);
         }
-        data_file.close();
-        cout << "  - Данные сохранены в synthetic_data.csv (для визуализации)\n";
 
-        // Сохранение JSON для Python визуализации
-        cout << "\n[9] Сохранение данных для визуализации...\n";
-        saveToJSON(synthetic_data.inputs, synthetic_data.targets, "true_clusters.json");
-
-        // Для предсказаний
-        vector<vector<double>> predictions;
-        for (size_t i = 0; i < synthetic_data.inputs.size(); ++i) {
-            vector<double> out = trainer.predict(synthetic_data.inputs[i]);
-            predictions.push_back({(out[0] > 0.5) ? 1.0 : 0.0});
+        // вычисление итогового скора в зависимости от количества обработанных датасетов
+        if (scores.size() == 3) {
+            double final_score = (scores[0] + scores[1] + scores[2]) / 3.0;
+            cout << "\n==============================\n";
+            cout << "Итоговый score\n";
+            cout << "F1(d1): " << fixed << setprecision(4) << scores[0] << "\n";
+            cout << "F1(d2): " << fixed << setprecision(4) << scores[1] << "\n";
+            cout << "Среднее F1 = " << fixed << setprecision(4) << final_score << "\n";
         }
-        saveToJSON(synthetic_data.inputs, predictions, "predictions.json");
-
-        // Итоговая статистика
-        cout << "\n=== Итоговая статистика ===\n";
-        cout << "  - Архитектура сети: " << n_features << " → 32 → 16 → 1\n";
-        cout << "  - Эпохи: " << cfg.epochs << "\n";
-        cout << "  - Learning rate: " << cfg.learning_rate << "\n";
-        cout << "  - Точность на валидации: " << val_accuracy << "%\n";
-        cout << "  - Файлы созданы: synthetic_model.txt, log.txt, synthetic_data.csv, true_clusters.json, predictions.json\n";
-
-        // Запуск Python скрипта
-        string copy_cmd1 = "copy true_clusters.json ..\\neuro_model\\";
-        string copy_cmd2 = "copy predictions.json ..\\neuro_model\\";
-
-        int copy1 = system(copy_cmd1.c_str());
-        int copy2 = system(copy_cmd2.c_str());
-        cout << "\n[10] Запуск Python скрипта для визуализации...\n";
-        int result = system("py ../neuro_model/plot.py");
-        if (result == 0) {
-            cout << "  ✅ Визуализация завершена\n";
-        } else {
-            cout << "  ⚠️ Не удалось запустить Python. Убедитесь, что Python установлен.\n";
+        else if (scores.size() == 2) {
+            double final_score = 0.5 * scores[0] + 0.5 * scores[1];
+            cout << "\n==============================\n";
+            cout << "Итоговый score\n";
+            cout << "F1(d1): " << fixed << setprecision(4) << scores[0] << "\n";
+            cout << "F1(d2): " << fixed << setprecision(4) << scores[1] << "\n";
+            cout << "0.5 * F1(d1) + 0.5 * F1(d2) = " << fixed << setprecision(4) << final_score << "\n";
+        }
+        else {
+            cout << "\nЗагружено " << scores.size() << " датасетов из " << datasets.size() << "\n";
         }
 
     } catch (const exception& e) {
-        cerr << "\n❌ Ошибка: " << e.what() << "\n";
+        cerr << "\nОшибка: " << e.what() << "\n";
         return 1;
     }
-
-    cout << "\n=== Программа успешно завершена ===\n";
-    return 0;
 }
