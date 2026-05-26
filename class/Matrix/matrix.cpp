@@ -347,17 +347,4 @@ Matrix<T> multiplyWithTranspose(const Matrix<T>& a, const Matrix<T>& b) {
     return result;
 }
 
-// ЯВНАЯ ИНСТАНЦИАЦИЯ
-template class Matrix<double>;
-template class Matrix<float>;
-template class Matrix<int>;
-
-template std::ostream& operator<< <double>(std::ostream&, const Matrix<double>&);
-template std::ostream& operator<< <float>(std::ostream&, const Matrix<float>&);
-template std::ostream& operator<< <int>(std::ostream&, const Matrix<int>&);
-
-template Matrix<double> multiplyWithTranspose<double>(const Matrix<double>&, const Matrix<double>&);
-template Matrix<float> multiplyWithTranspose<float>(const Matrix<float>&, const Matrix<float>&);
-template Matrix<int> multiplyWithTranspose<int>(const Matrix<int>&, const Matrix<int>&);
-
 #endif // MATRIX_CPP

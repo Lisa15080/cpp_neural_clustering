@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.14)
+
 project(neuro_project LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -8,85 +9,53 @@ if(POLICY CMP0135)
     cmake_policy(SET CMP0135 NEW)
 endif()
 
-# ===== GOOGLE TEST =====
-#set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-#include(FetchContent)
-#FetchContent_Declare(
-#        googletest
-#        URL https://github.com/google/googletest/archive/03597a01ee50ed33e9dfd640b249b4be3799d395.zip
-#        DOWNLOAD_EXTRACT_TIMESTAMP TRUE
-#)
-#FetchContent_MakeAvailable(googletest)
 
-#enable_testing()
-
-# ===== ОСНОВНАЯ БИБЛИОТЕКА =====
-add_library(neuro_lib STATIC
+set(PROJECT_SOURCES
         neuro_model/Neural_Net/neural_net.cpp
-        class/Matrix/matrix.cpp
-        parser/pars.cpp
         neuro_model/Trainer_class/trainer.cpp
         neuro_model/DataSet/dataset.cpp
+        parser/pars.cpp
 )
 
-target_include_directories(neuro_lib PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}
-        ${CMAKE_CURRENT_SOURCE_DIR}/neuro_model/Neural_Net
-        ${CMAKE_CURRENT_SOURCE_DIR}/class/Matrix
-)
-# ===== ИСПОЛНЯЕМЫЙ ФАЙЛ ДЛЯ MAIN =====
-add_executable(main neuro_model/main.cpp)  # или ваш файл с main
-
-# Подключаем библиотеку neuro_lib
-target_link_libraries(main PRIVATE neuro_lib)
-
-# Добавляем пути для include
-target_include_directories(main PRIVATE
+set(PROJECT_INCLUDE_DIRS
         ${CMAKE_CURRENT_SOURCE_DIR}
         ${CMAKE_CURRENT_SOURCE_DIR}/class/Matrix
         ${CMAKE_CURRENT_SOURCE_DIR}/neuro_model/Neural_Net
-        ${CMAKE_CURRENT_SOURCE_DIR}/Trainer_class
-        ${CMAKE_CURRENT_SOURCE_DIR}/DataSet
+        ${CMAKE_CURRENT_SOURCE_DIR}/neuro_model/Trainer_class
+        ${CMAKE_CURRENT_SOURCE_DIR}/neuro_model/DataSet
         ${CMAKE_CURRENT_SOURCE_DIR}/parser
+        ${CMAKE_CURRENT_SOURCE_DIR}/libs
 )
-# ===== ТЕСТЫ ДЛЯ НЕЙРОСЕТИ =====
 
 
-#add_executable(neural_tests
-#        test/test_neural_net.cpp
-#)
+add_executable(main
+        neuro_model/main.cpp
+        ${PROJECT_SOURCES}
+)
 
-#target_link_libraries(neural_tests
-#        PRIVATE
-#        neuro_lib
-#        GTest::gtest_main
-#)
+target_include_directories(main PRIVATE
+        ${PROJECT_INCLUDE_DIRS}
+)
 
-#target_include_directories(neural_tests PRIVATE
-#        ${CMAKE_CURRENT_SOURCE_DIR}
-#        ${CMAKE_CURRENT_SOURCE_DIR}/neuro_model/Neural_Net
-#        ${CMAKE_CURRENT_SOURCE_DIR}/class/Matrix
-#)
+include(FetchContent)
 
-# ===== ТЕСТЫ ДЛЯ МАТРИЦ =====
-#add_executable(matrix_tests
-#        test/test_matrix.cpp
-#        parser/pars.cpp
-#        parser/pars.h
-#)
+set(PYBIND11_FINDPYTHON ON)
 
-#target_link_libraries(matrix_tests
-#        PRIVATE
-#        neuro_lib
-#        GTest::gtest_main
-#)
+find_package(Python COMPONENTS Interpreter Development REQUIRED)
 
-#target_include_directories(matrix_tests PRIVATE
-#        ${CMAKE_CURRENT_SOURCE_DIR}
-#        ${CMAKE_CURRENT_SOURCE_DIR}/class/Matrix
-#)
+FetchContent_Declare(
+        pybind11
+        GIT_REPOSITORY https://github.com/pybind/pybind11.git
+        GIT_TAG v3.0.1
+)
 
-# ===== АВТОМАТИЧЕСКОЕ ОБНАРУЖЕНИЕ ТЕСТОВ =====
-#include(GoogleTest)
-#gtest_discover_tests(neural_tests)
-#gtest_discover_tests(matrix_tests)
+FetchContent_MakeAvailable(pybind11)
+
+pybind11_add_module(cpp_neural_clustering
+        bindings/pybind_module.cpp
+        ${PROJECT_SOURCES}
+)
+
+target_include_directories(cpp_neural_clustering PRIVATE
+        ${PROJECT_INCLUDE_DIRS}
+)
