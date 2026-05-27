@@ -21,16 +21,8 @@ print("Модуль загружен:", cnc.__doc__)
 import cpp_neural_clustering as cnc
 
 
-# ============================================================
-# 2. Путь к датасету
-# ============================================================
-
-DATASET_PATH = Path(__file__).resolve().parent / "dataset2 (1).csv"
-
-
-# ============================================================
-# 3. Загрузка CSV
-# ============================================================
+DATASET_PATH1 = Path(__file__).resolve().parent / "dataset1 (1).csv"
+DATASET_PATH2 = Path(__file__).resolve().parent / "dataset2 (1).csv"
 
 def load_dataset(path):
     X = []
@@ -107,10 +99,6 @@ def normalize(X, means, stds):
     return normalized
 
 
-# ============================================================
-# 6. Метрики
-# ============================================================
-
 def predict_binary(trainer, x, threshold=0.5):
     probability = trainer.predict(x)[0]
 
@@ -169,17 +157,17 @@ def calculate_metrics(trainer, X, y):
 
 def main():
     print("Модуль загружен:", cnc.__doc__)
+    print("========Dataset1=========")
+    x1, y1 = load_dataset(DATASET_PATH1)
 
-    X, y = load_dataset(DATASET_PATH)
-
-    print("Всего объектов:", len(X))
-    print("Размер входа:", len(X[0]))
-    print("Пример X:", X[0])
-    print("Пример y:", y[0])
+    print("Всего объектов:", len(x1))
+    print("Размер входа:", len(x1[0]))
+    print("Пример X:", x1[0])
+    print("Пример y:", y1[0])
 
     X_train, X_test, y_train, y_test = train_test_split(
-        X,
-        y,
+        x1,
+        y1,
         test_size=0.2,
         seed=42
     )
@@ -192,8 +180,6 @@ def main():
     print("Train size:", len(X_train))
     print("Test size:", len(X_test))
 
-    # Архитектура:
-    # 2 входа -> 8 нейронов -> 4 нейрона -> 1 выход
     network = cnc.NeuralNetwork(
         [2, 8, 4, 1],
         cnc.Activation.RELU,
@@ -212,12 +198,9 @@ def main():
     trainer.train(X_train, y_train)
 
     print("\nОбучение завершено.")
-
-    # Встроенная evaluate из C++ возвращает accuracy в процентах
     train_accuracy_cpp = trainer.evaluate(X_train, y_train)
     test_accuracy_cpp = trainer.evaluate(X_test, y_test)
 
-    print("\nAccuracy через C++ evaluate:")
     print(f"Train accuracy: {train_accuracy_cpp:.2f}%")
     print(f"Test accuracy:  {test_accuracy_cpp:.2f}%")
 
@@ -237,17 +220,74 @@ def main():
     print(f"Recall:    {test_metrics['recall']:.4f}")
     print(f"F1-score:  {test_metrics['f1']:.4f}")
     print(f"TP: {test_metrics['tp']}, TN: {test_metrics['tn']}, FP: {test_metrics['fp']}, FN: {test_metrics['fn']}")
+    f1_1 = test_metrics['f1']
 
-    print("\nПервые 10 предсказаний на test:")
-    for i in range(min(10, len(X_test))):
-        predicted, probability = predict_binary(trainer, X_test[i])
-        actual = int(y_test[i][0])
+    print("========Dataset2=========")
+    x1, y1 = load_dataset(DATASET_PATH2)
 
-        print(
-            f"{i + 1}) actual={actual}, "
-            f"predicted={predicted}, "
-            f"probability={probability:.4f}"
-        )
+    print("Всего объектов:", len(x1))
+    print("Размер входа:", len(x1[0]))
+    print("Пример X:", x1[0])
+    print("Пример y:", y1[0])
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        x1,
+        y1,
+        test_size=0.2,
+        seed=42
+    )
+
+    means, stds = compute_mean_std(X_train)
+
+    X_train = normalize(X_train, means, stds)
+    X_test = normalize(X_test, means, stds)
+
+    print("Train size:", len(X_train))
+    print("Test size:", len(X_test))
+
+    network = cnc.NeuralNetwork(
+        [2, 8, 4, 1],
+        cnc.Activation.RELU,
+        False,
+        ""
+    )
+
+    config = cnc.TrainingConfig()
+    config.epochs = 1000
+    config.learning_rate = 0.05
+    config.verbose = True
+
+    trainer = cnc.Trainer(network, config)
+
+    print("\nНачинаем обучение...")
+    trainer.train(X_train, y_train)
+
+    print("\nОбучение завершено.")
+
+    train_accuracy_cpp = trainer.evaluate(X_train, y_train)
+    test_accuracy_cpp = trainer.evaluate(X_test, y_test)
+
+    print(f"Train accuracy: {train_accuracy_cpp:.2f}%")
+    print(f"Test accuracy:  {test_accuracy_cpp:.2f}%")
+
+    train_metrics = calculate_metrics(trainer, X_train, y_train)
+    test_metrics = calculate_metrics(trainer, X_test, y_test)
+
+    print("\nМетрики на train:")
+    print(f"Accuracy:  {train_metrics['accuracy'] * 100:.2f}%")
+    print(f"Precision: {train_metrics['precision']:.4f}")
+    print(f"Recall:    {train_metrics['recall']:.4f}")
+    print(f"F1-score:  {train_metrics['f1']:.4f}")
+    print(f"TP: {train_metrics['tp']}, TN: {train_metrics['tn']}, FP: {train_metrics['fp']}, FN: {train_metrics['fn']}")
+
+    print("\nМетрики на test:")
+    print(f"Accuracy:  {test_metrics['accuracy'] * 100:.2f}%")
+    print(f"Precision: {test_metrics['precision']:.4f}")
+    print(f"Recall:    {test_metrics['recall']:.4f}")
+    print(f"F1-score:  {test_metrics['f1']:.4f}")
+    print(f"TP: {test_metrics['tp']}, TN: {test_metrics['tn']}, FP: {test_metrics['fp']}, FN: {test_metrics['fn']}")
+    f1_2 = test_metrics['f1']
+    print("оценка качества: ", f1_1*0.5 + f1_2*0.5)
 
 
 if __name__ == "__main__":
