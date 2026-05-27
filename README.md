@@ -1,9 +1,11 @@
-# 
+# 3, 4 Лабораторные работы по C++
 
-Реализация полносвязной нейронной сети на C++ без использования сторонних библиотек глубокого обучения. Проект включает кастомный класс для работы с матрицами, парсер CSV, генератор синтетических данных и  тренер.
+Реализация полносвязной нейронной сети на C++ без использования сторонних библиотек глубокого обучения. Проект включает кастомный класс для работы с матрицами, парсер CSV, генератор синтетических данных и  тренер. 
 
 ## Структура проекта
 cpp_neural_clustering
+├── bindings # Python binding через pybind11
+│   └── pybind_module.cpp
 ├── class
 │   └── Matrix # Математическое ядро
 │       ├── matrix.cpp
@@ -13,6 +15,8 @@ cpp_neural_clustering
 │   ├── circles_detaset.csv
 │   ├── test.csv
 │   └── train.csv
+├── libs
+│   └── json.hpp
 ├── neuro_model
 │   ├── DataSet #Генерация данных
 │   │   ├── dataset.cpp
@@ -34,6 +38,7 @@ cpp_neural_clustering
 │   └── README.md
 ├── README.md
 └── test #  Модульные тесты
-    ├── test_matrix.cpp
-    ├── test_neural_net.cpp
-    └── test_trainer.cpp
+│   ├── test_matrix.cpp
+│   ├── test_neural_net.cpp
+│   └── test_trainer.cpp
+└── test.py
